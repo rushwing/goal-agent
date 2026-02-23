@@ -1,0 +1,73 @@
+# docker-compose.yml – Full stack: API + MariaDB
+#
+# Usage:
+#   docker compose up -d          # start both services
+#   docker compose logs -f api    # follow API logs
+#   docker compose exec api uv run alembic upgrade head   # run migrations
+#   docker compose down           # stop (data persists in volume)
+#   docker compose down -v        # stop + wipe DB volume
+
+services:
+  # ── MariaDB ───────────────────────────────────────────────────────────────
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-rootpass}
+      MARIADB_DATABASE:      vocation_planner
+      MARIADB_USER:          planner
+      MARIADB_PASSWORD:      ${DB_PASSWORD:-plannerpass}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./systemd/99-planner.cnf:/etc/mysql/mariadb.conf.d/99-planner.cnf:ro
+    ports:
+      - "3306:3306"   # expose only on LAN; remove for production
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── API ───────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Override DATABASE_URL to point at the compose db service
+      DATABASE_URL: mysql+aiomysql://planner:${DB_PASSWORD:-plannerpass}@db:3306/vocation_planner
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount .env so secrets are not baked into the image
+      - ./.env:/app/.env:ro
+    # Run migrations then start the server
+    command: >
+      sh -c "
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop
+      "
+
+  # ── Migration runner (one-shot) ───────────────────────────────────────────
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql+aiomysql://planner:${DB_PASSWORD:-plannerpass}@db:3306/vocation_planner
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+    profiles:
+      - migrate   # run explicitly: docker compose --profile migrate up migrate
+
+volumes:
+  db_data:

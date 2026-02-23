@@ -1,0 +1,323 @@
+"""Plan MCP tools: targets and AI plan generation (role: parent/admin)."""
+import logging
+from datetime import date
+from typing import Optional
+
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
+from app.database import AsyncSessionLocal
+from app.mcp.auth import Role, require_role
+from app.mcp.server import mcp
+from app.crud import crud_pupil, crud_target, crud_plan
+from app.schemas.target import TargetCreate, TargetUpdate
+from app.schemas.plan import PlanUpdate
+from app.models.plan import Plan
+from app.models.weekly_milestone import WeeklyMilestone
+from app.models.task import Task
+from app.models.target import VacationType, TargetStatus
+from app.services import plan_generator, github_service
+
+logger = logging.getLogger(__name__)
+
+
+def _require_chat_id(chat_id: Optional[int]) -> int:
+    if chat_id is None:
+        raise ValueError("X-Telegram-Chat-Id header is required")
+    return chat_id
+
+
+@mcp.tool()
+async def create_target(
+    pupil_id: int,
+    title: str,
+    subject: str,
+    description: str,
+    vacation_type: str = "summer",
+    vacation_year: int = 2026,
+    priority: int = 3,
+    x_telegram_chat_id: Optional[int] = None,
+) -> dict:
+    """Create a learning target for a pupil. Requires parent/admin role."""
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin, Role.parent])
+        schema = TargetCreate(
+            pupil_id=pupil_id,
+            title=title,
+            subject=subject,
+            description=description,
+            vacation_type=VacationType(vacation_type),
+            vacation_year=vacation_year,
+            priority=priority,
+        )
+        target = await crud_target.create(db, obj_in=schema)
+        await db.commit()
+        return {"id": target.id, "title": target.title, "subject": target.subject, "pupil_id": target.pupil_id}
+
+
+@mcp.tool()
+async def update_target(
+    target_id: int,
+    title: Optional[str] = None,
+    subject: Optional[str] = None,
+    description: Optional[str] = None,
+    priority: Optional[int] = None,
+    status: Optional[str] = None,
+    x_telegram_chat_id: Optional[int] = None,
+) -> dict:
+    """Update a learning target. Requires parent/admin role."""
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin, Role.parent])
+        target = await crud_target.get(db, target_id)
+        if not target:
+            raise ValueError(f"Target {target_id} not found")
+        schema = TargetUpdate(
+            title=title, subject=subject, description=description,
+            priority=priority, status=TargetStatus(status) if status else None,
+        )
+        target = await crud_target.update(db, db_obj=target, obj_in=schema)
+        await db.commit()
+        return {"id": target.id, "title": target.title, "status": target.status.value}
+
+
+@mcp.tool()
+async def delete_target(
+    target_id: int,
+    x_telegram_chat_id: Optional[int] = None,
+) -> dict:
+    """Delete a learning target. Requires admin role."""
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin])
+        target = await crud_target.remove(db, id=target_id)
+        if not target:
+            raise ValueError(f"Target {target_id} not found")
+        await db.commit()
+        return {"success": True, "target_id": target_id}
+
+
+@mcp.tool()
+async def list_targets(
+    pupil_id: int,
+    x_telegram_chat_id: Optional[int] = None,
+) -> list[dict]:
+    """List targets for a pupil. Requires parent/admin role."""
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin, Role.parent])
+        targets = await crud_target.get_by_pupil(db, pupil_id)
+        return [
+            {"id": t.id, "title": t.title, "subject": t.subject, "status": t.status.value}
+            for t in targets
+        ]
+
+
+@mcp.tool()
+async def generate_plan(
+    target_id: int,
+    start_date: str,
+    end_date: str,
+    daily_study_minutes: int = 60,
+    preferred_days: Optional[list[int]] = None,
+    extra_instructions: Optional[str] = None,
+    x_telegram_chat_id: Optional[int] = None,
+) -> dict:
+    """
+    Generate an AI-powered study plan for a target using Kimi.
+    Automatically commits the plan to GitHub.
+    Requires parent/admin role.
+    """
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    if preferred_days is None:
+        preferred_days = [0, 1, 2, 3, 4]  # Mon-Fri default
+
+    start = date.fromisoformat(start_date)
+    end = date.fromisoformat(end_date)
+
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin, Role.parent])
+
+        target = await crud_target.get(db, target_id)
+        if not target:
+            raise ValueError(f"Target {target_id} not found")
+
+        pupil = await crud_pupil.get(db, target.pupil_id)
+        if not pupil:
+            raise ValueError(f"Pupil {target.pupil_id} not found")
+
+        plan = await plan_generator.generate_plan(
+            db=db,
+            target=target,
+            pupil_name=pupil.name,
+            grade=pupil.grade,
+            start_date=start,
+            end_date=end,
+            daily_study_minutes=daily_study_minutes,
+            preferred_days=preferred_days,
+            extra_instructions=extra_instructions,
+        )
+
+        # Build Markdown for GitHub
+        result = await db.execute(
+            select(Plan)
+            .options(selectinload(Plan.milestones).selectinload(WeeklyMilestone.tasks))
+            .where(Plan.id == plan.id)
+        )
+        full_plan = result.scalar_one()
+        md = _plan_to_markdown(full_plan, pupil.name, target)
+
+        try:
+            sha, path = await github_service.commit_plan(
+                pupil.name, target.vacation_type.value, target.vacation_year,
+                plan.title, md
+            )
+            plan.github_commit_sha = sha
+            plan.github_file_path = path
+        except Exception as exc:
+            logger.warning("GitHub commit failed: %s", exc)
+
+        await db.commit()
+
+        return {
+            "plan_id": plan.id,
+            "title": plan.title,
+            "start_date": str(plan.start_date),
+            "end_date": str(plan.end_date),
+            "total_weeks": plan.total_weeks,
+            "status": plan.status.value,
+            "github_file_path": plan.github_file_path,
+            "milestones": len(full_plan.milestones),
+        }
+
+
+def _plan_to_markdown(plan, pupil_name: str, target) -> str:
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    lines = [
+        f"# {plan.title}",
+        f"**Pupil:** {pupil_name}",
+        f"**Subject:** {target.subject}",
+        f"**Period:** {plan.start_date} – {plan.end_date}",
+        f"",
+        f"## Overview",
+        f"{plan.overview}",
+        f"",
+    ]
+    for ms in plan.milestones:
+        lines += [
+            f"## Week {ms.week_number}: {ms.title}",
+            f"*{ms.start_date} – {ms.end_date}*",
+            f"",
+            f"{ms.description}",
+            f"",
+            "| Day | Task | Type | Minutes | XP |",
+            "|-----|------|------|---------|-----|",
+        ]
+        for task in ms.tasks:
+            day = day_names[task.day_of_week]
+            opt = " *(opt)*" if task.is_optional else ""
+            lines.append(
+                f"| {day} | {task.title}{opt} | {task.task_type.value} | "
+                f"{task.estimated_minutes} | {task.xp_reward} |"
+            )
+        lines.append("")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def update_plan(
+    plan_id: int,
+    title: Optional[str] = None,
+    status: Optional[str] = None,
+    x_telegram_chat_id: Optional[int] = None,
+) -> dict:
+    """Update a plan's title or status. Requires parent/admin role."""
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin, Role.parent])
+        plan = await crud_plan.get(db, plan_id)
+        if not plan:
+            raise ValueError(f"Plan {plan_id} not found")
+        from app.models.plan import PlanStatus
+        schema = PlanUpdate(
+            title=title,
+            status=PlanStatus(status) if status else None,
+        )
+        plan = await crud_plan.update(db, db_obj=plan, obj_in=schema)
+        await db.commit()
+        return {"id": plan.id, "title": plan.title, "status": plan.status.value}
+
+
+@mcp.tool()
+async def delete_plan(
+    plan_id: int,
+    x_telegram_chat_id: Optional[int] = None,
+) -> dict:
+    """Delete a plan. Requires admin role."""
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin])
+        plan = await crud_plan.remove(db, id=plan_id)
+        if not plan:
+            raise ValueError(f"Plan {plan_id} not found")
+        await db.commit()
+        return {"success": True, "plan_id": plan_id}
+
+
+@mcp.tool()
+async def list_plans(
+    pupil_id: Optional[int] = None,
+    target_id: Optional[int] = None,
+    x_telegram_chat_id: Optional[int] = None,
+) -> list[dict]:
+    """List plans. Requires parent/admin role."""
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin, Role.parent])
+        if pupil_id:
+            plans = await crud_plan.get_by_pupil(db, pupil_id, target_id)
+        else:
+            plans = await crud_plan.get_multi(db)
+        return [
+            {"id": p.id, "title": p.title, "status": p.status.value,
+             "start_date": str(p.start_date), "end_date": str(p.end_date)}
+            for p in plans
+        ]
+
+
+@mcp.tool()
+async def get_plan_detail(
+    plan_id: int,
+    x_telegram_chat_id: Optional[int] = None,
+) -> dict:
+    """Get full plan with milestones and tasks. Requires parent/admin role."""
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin, Role.parent])
+        plan = await crud_plan.get_with_milestones(db, plan_id)
+        if not plan:
+            raise ValueError(f"Plan {plan_id} not found")
+        return {
+            "id": plan.id,
+            "title": plan.title,
+            "overview": plan.overview,
+            "status": plan.status.value,
+            "start_date": str(plan.start_date),
+            "end_date": str(plan.end_date),
+            "total_weeks": plan.total_weeks,
+            "milestones": [
+                {
+                    "week_number": ms.week_number,
+                    "title": ms.title,
+                    "total_tasks": ms.total_tasks,
+                    "completed_tasks": ms.completed_tasks,
+                    "tasks": [
+                        {"id": t.id, "title": t.title, "day_of_week": t.day_of_week,
+                         "estimated_minutes": t.estimated_minutes, "xp_reward": t.xp_reward}
+                        for t in ms.tasks
+                    ],
+                }
+                for ms in plan.milestones
+            ],
+        }

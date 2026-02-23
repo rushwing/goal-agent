@@ -191,6 +191,14 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Node (openclaw-plugin)
+openclaw-plugin/node_modules/
+openclaw-plugin/dist/
+
 # PyPI configuration file
 .pypirc
 
