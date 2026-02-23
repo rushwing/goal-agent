@@ -7,6 +7,7 @@ from app.database import get_db
 from app.api.v1.deps import require_any_role
 from app.mcp.auth import resolve_role, Role
 from app.crud import crud_pupil, crud_report
+from app.crud.parents import crud_parent
 from app.models.report import ReportType
 from app.services import report_service
 
@@ -19,10 +20,16 @@ async def _resolve_pupil(db, chat_id: int, pupil_id: Optional[int]):
         if pupil_id is None:
             raise HTTPException(400, "pupil_id required")
         pupil = await crud_pupil.get(db, pupil_id)
+        if not pupil:
+            raise HTTPException(404, "Pupil not found")
+        if role == Role.parent:
+            parent = await crud_parent.get_by_chat_id(db, chat_id)
+            if not parent or pupil.parent_id != parent.id:
+                raise HTTPException(403, "Not authorized to access this pupil")
     else:
         pupil = await crud_pupil.get_by_chat_id(db, chat_id)
-    if not pupil:
-        raise HTTPException(404, "Pupil not found")
+        if not pupil:
+            raise HTTPException(404, "Pupil not found")
     return pupil
 
 

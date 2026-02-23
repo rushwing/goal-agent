@@ -3,17 +3,14 @@ import logging
 from datetime import date, timedelta
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.check_in import CheckIn, CheckInStatus
-from app.models.task import Task
-from app.models.weekly_milestone import WeeklyMilestone
-from app.models.plan import Plan, PlanStatus
-from app.models.target import Target
 from app.models.pupil import Pupil
 from app.models.report import Report, ReportType
 from app.services import llm_service, github_service
+from app.crud.reports import crud_report
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +18,13 @@ logger = logging.getLogger(__name__)
 async def _fetch_check_ins(
     db: AsyncSession, pupil_id: int, start: date, end: date
 ) -> list[CheckIn]:
+    """Fetch check-ins by actual event date (created_at), not milestone coverage."""
     result = await db.execute(
         select(CheckIn)
-        .join(Task, CheckIn.task_id == Task.id)
-        .join(WeeklyMilestone, Task.milestone_id == WeeklyMilestone.id)
         .where(
             CheckIn.pupil_id == pupil_id,
-            WeeklyMilestone.start_date <= end,
-            WeeklyMilestone.end_date >= start,
+            func.date(CheckIn.created_at) >= start,
+            func.date(CheckIn.created_at) <= end,
         )
     )
     return list(result.scalars().all())
@@ -108,6 +104,10 @@ async def generate_daily_report(
     db: AsyncSession, pupil: Pupil, report_date: Optional[date] = None
 ) -> Report:
     report_date = report_date or date.today()
+    existing = await crud_report.get_existing(db, pupil.id, ReportType.daily, report_date)
+    if existing:
+        logger.info("Daily report for pupil %d on %s already exists (id=%d), reusing", pupil.id, report_date, existing.id)
+        return existing
     check_ins = await _fetch_check_ins(db, pupil.id, report_date, report_date)
     stats = _build_stats(check_ins)
     period_label = str(report_date)
@@ -149,7 +149,10 @@ async def generate_weekly_report(
         today = date.today()
         week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
-
+    existing = await crud_report.get_existing(db, pupil.id, ReportType.weekly, week_start)
+    if existing:
+        logger.info("Weekly report for pupil %d week_start=%s already exists (id=%d), reusing", pupil.id, week_start, existing.id)
+        return existing
     check_ins = await _fetch_check_ins(db, pupil.id, week_start, week_end)
     stats = _build_stats(check_ins)
     period_label = f"week_{week_start.isocalendar().week:02d}_{week_start.year}"
@@ -197,6 +200,10 @@ async def generate_monthly_report(
     else:
         period_end = date(year, month + 1, 1) - timedelta(days=1)
 
+    existing = await crud_report.get_existing(db, pupil.id, ReportType.monthly, period_start)
+    if existing:
+        logger.info("Monthly report for pupil %d %d-%02d already exists (id=%d), reusing", pupil.id, year, month, existing.id)
+        return existing
     check_ins = await _fetch_check_ins(db, pupil.id, period_start, period_end)
     stats = _build_stats(check_ins)
     period_label = f"{year}_{month:02d}"

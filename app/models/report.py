@@ -2,7 +2,7 @@ import enum
 from datetime import date
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, Integer, MediumText, String
+from sqlalchemy import Boolean, Date, Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -29,6 +29,9 @@ class ReportType(str, enum.Enum):
 
 class Report(Base, TimestampMixin):
     __tablename__ = "reports"
+    __table_args__ = (
+        UniqueConstraint("pupil_id", "report_type", "period_start", name="uq_report_identity"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     pupil_id: Mapped[int] = mapped_column(Integer, ForeignKey("pupils.id"), nullable=False)

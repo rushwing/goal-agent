@@ -52,6 +52,10 @@ async def checkin_task(
     task = await crud_task.get(db, body.task_id)
     if not task:
         raise HTTPException(404, "Task not found")
+    if not await crud_task.get_with_ownership(db, body.task_id, pupil.id):
+        raise HTTPException(403, "Task does not belong to this pupil")
+    if not await crud_task.get_eligible_for_date(db, body.task_id, pupil.id, date.today()):
+        raise HTTPException(422, "Task is not scheduled for today")
 
     existing = await crud_check_in.get_by_task_and_pupil(db, body.task_id, pupil.id)
     if existing:
@@ -95,6 +99,13 @@ async def skip_task(
     if role != Role.pupil:
         raise HTTPException(403, "Pupil role required")
     pupil = await crud_pupil.get_by_chat_id(db, chat_id)
+    task = await crud_task.get(db, body.task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+    if not await crud_task.get_with_ownership(db, body.task_id, pupil.id):
+        raise HTTPException(403, "Task does not belong to this pupil")
+    if not await crud_task.get_eligible_for_date(db, body.task_id, pupil.id, date.today()):
+        raise HTTPException(422, "Task is not scheduled for today")
     existing = await crud_check_in.get_by_task_and_pupil(db, body.task_id, pupil.id)
     if existing:
         return {"already_recorded": True}

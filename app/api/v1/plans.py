@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.api.v1.deps import require_parent_or_admin, require_admin
+from app.api.v1.deps import require_parent_or_admin, require_admin, verify_parent_owns_pupil
 from app.crud import crud_target, crud_plan, crud_pupil
 from app.schemas.target import TargetCreate, TargetUpdate, TargetResponse
 from app.schemas.plan import PlanUpdate, PlanResponse, GeneratePlanRequest
@@ -22,8 +22,9 @@ router = APIRouter(tags=["plans"])
 async def list_targets(
     pupil_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[int, Depends(require_parent_or_admin)],
+    chat_id: Annotated[int, Depends(require_parent_or_admin)],
 ):
+    await verify_parent_owns_pupil(pupil_id, chat_id, db)
     return await crud_target.get_by_pupil(db, pupil_id)
 
 
@@ -31,8 +32,9 @@ async def list_targets(
 async def create_target(
     body: TargetCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[int, Depends(require_parent_or_admin)],
+    chat_id: Annotated[int, Depends(require_parent_or_admin)],
 ):
+    await verify_parent_owns_pupil(body.pupil_id, chat_id, db)
     return await crud_target.create(db, obj_in=body)
 
 
@@ -66,9 +68,10 @@ async def list_plans(
     pupil_id: Optional[int] = None,
     target_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
-    _: int = Depends(require_parent_or_admin),
+    chat_id: int = Depends(require_parent_or_admin),
 ):
     if pupil_id:
+        await verify_parent_owns_pupil(pupil_id, chat_id, db)
         return await crud_plan.get_by_pupil(db, pupil_id, target_id)
     return await crud_plan.get_multi(db)
 
@@ -77,7 +80,7 @@ async def list_plans(
 async def generate_plan(
     body: GeneratePlanRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[int, Depends(require_parent_or_admin)],
+    chat_id: Annotated[int, Depends(require_parent_or_admin)],
 ):
     target = await crud_target.get(db, body.target_id)
     if not target:
@@ -85,6 +88,7 @@ async def generate_plan(
     pupil = await crud_pupil.get(db, target.pupil_id)
     if not pupil:
         raise HTTPException(404, "Pupil not found")
+    await verify_parent_owns_pupil(target.pupil_id, chat_id, db)
 
     plan = await plan_generator.generate_plan(
         db=db,
