@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "repository": "rushwing/vocation_study_planner",
+  "workers": [
+    "claude",
+    "gemini",
+    "kimi",
+    "minimax"
+  ],
+  "labels": {
+    "owner": [
+      "llm-owner:claude",
+      "llm-owner:gemini",
+      "llm-owner:kimi",
+      "llm-owner:minimax"
+    ],
+    "reviewer": [
+      "llm-reviewer:claude",
+      "llm-reviewer:gemini",
+      "llm-reviewer:kimi",
+      "llm-reviewer:minimax"
+    ],
+    "queue": [
+      "queue:ready-impl",
+      "queue:claimed",
+      "queue:in-pr",
+      "queue:ready-review",
+      "queue:blocked",
+      "queue:needs-human",
+      "queue:done"
+    ]
+  },
+  "queue_rules": {
+    "exactly_one_queue_label": true,
+    "default_lease_hours": 24,
+    "do_not_claim_if_labels_present": [
+      "queue:claimed",
+      "queue:in-pr"
+    ]
+  },
+  "claim_comment": {
+    "header": "[bot-claim]",
+    "required_fields": [
+      "worker",
+      "role",
+      "claimed_at",
+      "lease_hours"
+    ],
+    "optional_fields": [
+      "branch"
+    ],
+    "allowed_roles": [
+      "implementer",
+      "reviewer"
+    ]
+  },
+  "blocked_comment": {
+    "header": "[bot-blocked]",
+    "recommended_fields": [
+      "reason",
+      "next_check"
+    ]
+  },
+  "routing_defaults": {
+    "implementer": [
+      {
+        "when_labels_any": [
+          "security"
+        ],
+        "owner": "claude"
+      },
+      {
+        "when_labels_any": [
+          "backend",
+          "data-integrity"
+        ],
+        "owner": "claude"
+      },
+      {
+        "when_labels_any": [
+          "enhancement"
+        ],
+        "title_matches_any": [
+          "Telegram",
+          "bot",
+          "CI",
+          "DX",
+          "pyproject",
+          "uv"
+        ],
+        "owner": "gemini"
+      }
+    ],
+    "reviewer": [
+      {
+        "when_labels_any": [
+          "security"
+        ],
+        "reviewers": [
+          "minimax"
+        ]
+      },
+      {
+        "when_labels_any": [
+          "data-integrity"
+        ],
+        "reviewers": [
+          "minimax"
+        ]
+      },
+      {
+        "title_matches_any": [
+          "Telegram",
+          "prompt",
+          "report"
+        ],
+        "reviewers": [
+          "kimi"
+        ]
+      },
+      {
+        "when_labels_any": [
+          "backend"
+        ],
+        "title_matches_any": [
+          "CI",
+          "DX",
+          "pyproject",
+          "uv"
+        ],
+        "reviewers": [
+          "claude"
+        ]
+      }
+    ]
+  }
+}

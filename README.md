@@ -45,6 +45,14 @@ AI-powered vacation study planner for families. Generates personalised study pla
 
 ---
 
+## Collaboration / Issue Flow
+
+- Human quick start (3-minute triage/routing guide): [`docs/issues/quick_start_for_humans.md`](docs/issues/quick_start_for_humans.md)
+- Human-facing issue lifecycle and capability-based assignment guide: [`docs/issues/issue_flow.md`](docs/issues/issue_flow.md)
+- Machine-readable LLM routing protocol: [`.github/LLM_ROUTING.md`](.github/LLM_ROUTING.md)
+
+---
+
 ## Project Layout
 
 ```
