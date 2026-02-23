@@ -53,5 +53,39 @@ class CRUDTask(CRUDBase[Task, TaskBase, TaskBase]):
         )
         return result.scalars().all()
 
+    async def get_with_ownership(
+        self, db: AsyncSession, task_id: int, pupil_id: int
+    ) -> Optional[Task]:
+        """Return task if it belongs to the given pupil (via Target), ignoring date/status."""
+        result = await db.execute(
+            select(Task)
+            .join(WeeklyMilestone, Task.milestone_id == WeeklyMilestone.id)
+            .join(Plan, WeeklyMilestone.plan_id == Plan.id)
+            .join(Target, Plan.target_id == Target.id)
+            .where(Task.id == task_id, Target.pupil_id == pupil_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_eligible_for_date(
+        self, db: AsyncSession, task_id: int, pupil_id: int, check_date: date
+    ) -> Optional[Task]:
+        """Return task if it belongs to the pupil and is scheduled for check_date."""
+        day_of_week = check_date.weekday()
+        result = await db.execute(
+            select(Task)
+            .join(WeeklyMilestone, Task.milestone_id == WeeklyMilestone.id)
+            .join(Plan, WeeklyMilestone.plan_id == Plan.id)
+            .join(Target, Plan.target_id == Target.id)
+            .where(
+                Task.id == task_id,
+                Target.pupil_id == pupil_id,
+                Plan.status == PlanStatus.active,
+                WeeklyMilestone.start_date <= check_date,
+                WeeklyMilestone.end_date >= check_date,
+                Task.day_of_week == day_of_week,
+            )
+        )
+        return result.scalar_one_or_none()
+
 
 crud_task = CRUDTask(Task)

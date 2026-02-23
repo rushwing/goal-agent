@@ -127,6 +127,17 @@ async def generate_plan(
 
     total_weeks = max(1, (((end_date - start_date).days + 1) + 6) // 7)
 
+    # Deactivate any existing active plans for this pupil (single-active-plan invariant)
+    from sqlalchemy import select as _select
+    existing_active = await db.execute(
+        _select(Plan)
+        .join(Target, Plan.target_id == Target.id)
+        .where(Target.pupil_id == target.pupil_id, Plan.status == PlanStatus.active)
+    )
+    for old_plan in existing_active.scalars().all():
+        old_plan.status = PlanStatus.completed
+    await db.flush()
+
     # Create Plan record
     plan = Plan(
         target_id=target.id,

@@ -26,6 +26,7 @@ class PupilResponse(PupilBase):
     model_config = {"from_attributes": True}
 
     id: int
+    parent_id: Optional[int]
     xp_total: int
     streak_current: int
     streak_longest: int

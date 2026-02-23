@@ -17,8 +17,12 @@ class CRUDPupil(CRUDBase[Pupil, PupilCreate, PupilUpdate]):
         result = await db.execute(select(Pupil).where(Pupil.is_active == True))
         return result.scalars().all()
 
+    async def get_by_parent(self, db: AsyncSession, parent_id: int) -> Sequence[Pupil]:
+        result = await db.execute(select(Pupil).where(Pupil.parent_id == parent_id))
+        return result.scalars().all()
+
     async def create(self, db: AsyncSession, *, obj_in: PupilCreate) -> Pupil:
-        data = obj_in.model_dump(exclude={"parent_id"})
+        data = obj_in.model_dump()  # parent_id is now persisted
         db_obj = Pupil(**data)
         db.add(db_obj)
         await db.flush()

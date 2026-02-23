@@ -44,3 +44,22 @@ async def require_any_role(
     if role == Role.unknown:
         raise HTTPException(status_code=403, detail="Unknown user")
     return chat_id
+
+
+async def verify_parent_owns_pupil(
+    pupil_id: int,
+    chat_id: int,
+    db: AsyncSession,
+) -> None:
+    """Raise 403 if the authenticated parent doesn't own the given pupil. Admin always passes."""
+    role = await resolve_role(db, chat_id)
+    if role == Role.admin:
+        return
+    from app.crud.pupils import crud_pupil
+    from app.crud.parents import crud_parent
+    parent = await crud_parent.get_by_chat_id(db, chat_id)
+    if not parent:
+        raise HTTPException(status_code=403, detail="Parent not found")
+    pupil = await crud_pupil.get(db, pupil_id)
+    if not pupil or pupil.parent_id != parent.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this pupil")
