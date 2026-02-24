@@ -1,10 +1,14 @@
 """FastAPI application entry point with FastMCP mounted and APScheduler."""
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.auth.hmac_auth import verify_request_signature
 from app.config import get_settings
 from app.services.scheduler_service import scheduler, setup_scheduler
 
@@ -17,6 +21,36 @@ logging.basicConfig(
 )
 
 
+class HmacMiddleware(BaseHTTPMiddleware):
+    """Verify HMAC-signed requests when HMAC_SECRET is configured.
+
+    Only requests that carry the X-Telegram-Chat-Id header are checked.
+    Requests without that header pass through (dependencies still guard access).
+    When HMAC_SECRET is empty the middleware is a no-op (dev/test mode).
+    """
+
+    async def dispatch(self, request, call_next):
+        if not settings.HMAC_SECRET:
+            return await call_next(request)
+
+        chat_id_header = request.headers.get("x-telegram-chat-id")
+        if chat_id_header is None:
+            return await call_next(request)
+
+        ok = verify_request_signature(
+            settings.HMAC_SECRET,
+            chat_id_header,
+            request.headers.get("x-request-timestamp"),
+            request.headers.get("x-nonce"),
+            request.headers.get("x-signature"),
+        )
+        if not ok:
+            return JSONResponse(
+                {"detail": "Invalid request signature"}, status_code=401
+            )
+        return await call_next(request)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -24,8 +58,25 @@ async def lifespan(app: FastAPI):
     setup_scheduler()
     scheduler.start()
     logger.info("APScheduler started with %d jobs", len(scheduler.get_jobs()))
+
+    bot_task = None
+    if settings.TELEGRAM_PUPIL_BOT_TOKEN:
+        from app.bots.student_bot import start_student_bot
+
+        bot_task = asyncio.create_task(start_student_bot())
+        logger.info("Telegram student bot task started")
+    else:
+        logger.info("TELEGRAM_PUPIL_BOT_TOKEN not set – student bot disabled")
+
     yield
+
     # Shutdown
+    if bot_task:
+        bot_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await bot_task
+        logger.info("Telegram student bot stopped")
+
     scheduler.shutdown(wait=False)
     logger.info("APScheduler stopped")
 
@@ -44,6 +95,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# HMAC signature verification (Issue #3) — must be added after CORS
+app.add_middleware(HmacMiddleware)
 
 # REST API router
 from app.api.v1.router import router as api_router  # noqa: E402
