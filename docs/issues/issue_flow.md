@@ -79,35 +79,39 @@ Use **exactly one** queue state at a time. The label alone must identify who act
                                queue:review-active
                                 (reviewing)
                                /      |       \
-                     approved /       |        \ changes
-                    + merged /        |         \ requested
-                            ▼         │          ▼
-                       queue:done  releases   queue:ready-impl
-                       (resolved)  without     (re-opens for
-                                   result      implementation)
-                                      │
-                                      ▼
-                                  queue:in-pr
-                              (back to awaiting
-                               reviewer)
+                    approved /        |        \ changes
+                            /         |         \ requested
+                           ▼          │          ▼
+                    queue:approved  releases   queue:ready-impl
+                    (human merges;  without     (re-opens for
+                     LLM closes)    result      implementation)
+                         │             │
+                  human  │             ▼
+                  merges;│         queue:in-pr
+                  LLM    ▼        (back to awaiting
+                  closes queue:done    reviewer)
+                         (resolved)
 ```
 
 ### Transition table
 
 | From | To | Who acts |
 |---|---|---|
-| `queue:ready-impl` | `queue:impl-active` | Implementer claims |
-| `queue:impl-active` | `queue:in-pr` | Implementer opens PR |
-| `queue:impl-active` | `queue:needs-human` | Implementer hits decision blocker |
-| `queue:impl-active` | `queue:blocked` | Implementer hits dependency blocker |
-| `queue:in-pr` | `queue:review-active` | Reviewer claims |
-| `queue:review-active` | `queue:done` | Reviewer: approved + merged |
-| `queue:review-active` | `queue:ready-impl` | Reviewer: changes requested |
-| `queue:review-active` | `queue:in-pr` | Reviewer: releases claim without result |
-| `queue:review-active` | `queue:needs-human` | Reviewer hits decision blocker |
-| `queue:needs-human` | `queue:ready-impl` | Human resolved implementation blocker |
-| `queue:needs-human` | `queue:in-pr` | Human resolved review-stage blocker |
-| `queue:blocked` | `queue:ready-impl` | Upstream dependency resolved |
+| `queue:ready-impl` | `queue:impl-active` | LLM implementer claims |
+| `queue:impl-active` | `queue:in-pr` | LLM implementer opens PR |
+| `queue:impl-active` | `queue:needs-human` | LLM implementer hits decision blocker |
+| `queue:impl-active` | `queue:blocked` | LLM implementer hits dependency blocker |
+| `queue:in-pr` | `queue:review-active` | LLM reviewer claims |
+| `queue:review-active` | `queue:approved` | LLM reviewer: review passed |
+| `queue:review-active` | `queue:ready-impl` | LLM reviewer: changes requested |
+| `queue:review-active` | `queue:in-pr` | LLM reviewer: releases claim without result |
+| `queue:review-active` | `queue:needs-human` | LLM reviewer: hits decision blocker |
+| `queue:approved` | `queue:done` | **Human** merges PR → **LLM** sets done + closes issue |
+| `queue:needs-human` | `queue:ready-impl` | **Human: resolved implementation blocker** |
+| `queue:needs-human` | `queue:in-pr` | **Human: resolved review-stage blocker** |
+| `queue:blocked` | `queue:ready-impl` | **Human: upstream dependency resolved** |
+
+> **Merge policy:** LLM workers share the same GitHub account as the repo owner and cannot self-merge. `queue:approved` is the signal for the human to merge. After the human merges, the LLM handles post-merge housekeeping (`queue:approved` → `queue:done` + close issue), ideally triggered by the `pull_request: closed+merged` event.
 
 ## Recommended Triage Steps (Human Maintainer)
 
@@ -158,11 +162,11 @@ Confusing bot flow / wording        UX / wording reviewer
 
 ## Human Decisions That Should Not Be Auto-Delegated
 
+- **All PR merges** — LLM workers share the same GitHub account; merging must always be done by the human
 - Security tradeoffs and trust boundaries
 - Schema migration rollout and data backfill strategy
 - Breaking API changes
 - Priority overrides across issues
-- Merge approval for high-risk changes
 
 ## Practical Examples (Capability Mapping Only)
 

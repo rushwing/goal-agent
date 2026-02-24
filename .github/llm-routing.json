@@ -25,6 +25,7 @@
       "queue:impl-active",
       "queue:in-pr",
       "queue:review-active",
+      "queue:approved",
       "queue:needs-human",
       "queue:blocked",
       "queue:done"
@@ -38,17 +39,22 @@
       "queue:review-active"
     ]
   },
+  "merge_policy": {
+    "note": "All PRs must be merged by the human maintainer. LLM workers share the same GitHub account as the owner and cannot self-merge. Reviewers signal approval via queue:approved; the human performs the actual GitHub merge; the LLM then handles post-merge housekeeping (queue:approved → queue:done + close issue), ideally triggered by the pull_request:closed+merged event."
+  },
   "transitions": {
     "queue:ready-impl":    ["queue:impl-active"],
     "queue:impl-active":   ["queue:in-pr", "queue:needs-human", "queue:blocked"],
     "queue:in-pr":         ["queue:review-active"],
-    "queue:review-active": ["queue:done", "queue:ready-impl", "queue:in-pr", "queue:needs-human"],
+    "queue:review-active": ["queue:approved", "queue:ready-impl", "queue:in-pr", "queue:needs-human"],
+    "queue:approved":      ["queue:done"],
     "queue:needs-human":   ["queue:ready-impl", "queue:in-pr"],
     "queue:blocked":       ["queue:ready-impl"],
     "queue:done":          []
   },
   "transition_notes": {
-    "queue:review-active -> queue:done":       "approved + merged",
+    "queue:review-active -> queue:approved":   "reviewer approved; human must merge the PR",
+    "queue:approved      -> queue:done":       "LLM sets this after detecting PR merged (pull_request:closed+merged event); human must have merged first",
     "queue:review-active -> queue:ready-impl": "changes requested; re-opens for a new impl claim",
     "queue:review-active -> queue:in-pr":      "reviewer releases claim without a result; back to waiting for reviewer",
     "queue:review-active -> queue:needs-human":"review blocked on human judgment",
