@@ -16,7 +16,7 @@ It is intended for human developers and maintainers.
 - One issue should have one primary implementer at a time
 - Reviews should be assigned by risk type (security, data integrity, DX, UX)
 - Use queue states to control flow
-- Prefer capability-based routing over ad hoc assignment
+- **Each queue state has exactly one actor and an unambiguous set of valid next states** — no agent should need to read comment history to decide what to do next
 - Human maintainers own prioritization and merge decisions
 
 ## Capability-Based Assignment Strategy
@@ -53,52 +53,61 @@ Do not assign by model name in this document. Assign by capability profile.
 
 ## Issue Lifecycle (Queue Flow)
 
-Use one queue state at a time.
+Use **exactly one** queue state at a time. The label alone must identify who acts next.
 
 ```text
-                  +----------------------+
-                  |  queue:blocked       |
-                  |  Waiting on decision |
-                  |  or dependency       |
-                  +----------+-----------+
-                             |
-                             | (blocker resolved)
-                             v
-+----------------------+   +----------------------+   claim   +----------------------+
-| New / Triaged Issue  |-->| queue:ready-impl     |---------> | queue:claimed        |
-| (priority + labels)  |   | Ready to implement   |           | Lease active         |
-+----------------------+   +----------------------+           +----------+-----------+
-                                                                          |
-                                                                          | PR opened
-                                                                          v
-                                                               +----------------------+
-                                                               | queue:in-pr          |
-                                                               | Implementation in PR |
-                                                               +----------+-----------+
-                                                                          |
-                                                                          | impl complete,
-                                                                          | reviewer requested
-                                                                          v
-                                                               +----------------------+
-                                                               | queue:ready-review   |
-                                                               | Ready for review      |
-                                                               +----------+-----------+
-                                                                          |
-                                         +--------------------------------+------------------------------+
-                                         |                                                               |
-                                         | review finds blocker / decision needed                         | review passes + merged
-                                         v                                                               v
-                              +----------------------+                                      +----------------------+
-                              | queue:needs-human    |------------------------------------->| queue:done           |
-                              | Human decision needed|  (decision applied / follow-up done)| Resolved / merged    |
-                              +----------+-----------+                                      +----------------------+
-                                         |
-                                         | back to implementation
-                                         v
-                              +----------------------+
-                              | queue:ready-impl     |
-                              +----------------------+
+  queue:blocked ──── blocker resolved ───► queue:ready-impl
+  (waiting on dep)                          (unowned)
+                                               │
+                                    implementer claims
+                                               │
+                                               ▼
+                                      queue:impl-active
+                                       (implementing)
+                                          │       │
+                               PR opened │       │ blocked on
+                                         │       │ decision/dep
+                                         ▼       ▼
+                                    queue:in-pr  queue:needs-human
+                                  (awaiting      (human decides)
+                                   reviewer)        │        │
+                                      │             │        │
+                           reviewer   │    back to  │        │ back to
+                           claims     │    impl     ▼        ▼ review
+                                      │       queue:ready-impl
+                                      ▼       queue:in-pr
+                               queue:review-active
+                                (reviewing)
+                               /      |       \
+                     approved /       |        \ changes
+                    + merged /        |         \ requested
+                            ▼         │          ▼
+                       queue:done  releases   queue:ready-impl
+                       (resolved)  without     (re-opens for
+                                   result      implementation)
+                                      │
+                                      ▼
+                                  queue:in-pr
+                              (back to awaiting
+                               reviewer)
 ```
+
+### Transition table
+
+| From | To | Who acts |
+|---|---|---|
+| `queue:ready-impl` | `queue:impl-active` | Implementer claims |
+| `queue:impl-active` | `queue:in-pr` | Implementer opens PR |
+| `queue:impl-active` | `queue:needs-human` | Implementer hits decision blocker |
+| `queue:impl-active` | `queue:blocked` | Implementer hits dependency blocker |
+| `queue:in-pr` | `queue:review-active` | Reviewer claims |
+| `queue:review-active` | `queue:done` | Reviewer: approved + merged |
+| `queue:review-active` | `queue:ready-impl` | Reviewer: changes requested |
+| `queue:review-active` | `queue:in-pr` | Reviewer: releases claim without result |
+| `queue:review-active` | `queue:needs-human` | Reviewer hits decision blocker |
+| `queue:needs-human` | `queue:ready-impl` | Human resolved implementation blocker |
+| `queue:needs-human` | `queue:in-pr` | Human resolved review-stage blocker |
+| `queue:blocked` | `queue:ready-impl` | Upstream dependency resolved |
 
 ## Recommended Triage Steps (Human Maintainer)
 
@@ -143,7 +152,7 @@ Confusing bot flow / wording        UX / wording reviewer
 ## Conflict Avoidance Rules
 
 - Do not let two implementers modify the same issue at the same time
-- A claimed issue should not be re-claimed until lease expires (unless human overrides)
+- An issue with `queue:impl-active` or `queue:review-active` should not be re-claimed until the lease expires (unless human overrides)
 - Reviewers should review first, not rewrite immediately
 - If implementation and review disagree on design semantics, move to `queue:needs-human`
 
