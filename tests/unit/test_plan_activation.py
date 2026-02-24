@@ -1,4 +1,5 @@
 """Tests for issue #4: single active plan invariant per pupil."""
+
 from datetime import date, timedelta
 from unittest.mock import AsyncMock, patch
 
@@ -19,16 +20,23 @@ async def pupil_with_target(db):
     await db.flush()
 
     pupil = Pupil(
-        parent_id=parent.id, name="Charlie", display_name="Charlie",
-        grade="4", telegram_chat_id=6002,
+        parent_id=parent.id,
+        name="Charlie",
+        display_name="Charlie",
+        grade="4",
+        telegram_chat_id=6002,
     )
     db.add(pupil)
     await db.flush()
 
     target = Target(
-        pupil_id=pupil.id, title="English", subject="English",
-        description="", vacation_type=VacationType.summer,
-        vacation_year=date.today().year, status=TargetStatus.active,
+        pupil_id=pupil.id,
+        title="English",
+        subject="English",
+        description="",
+        vacation_type=VacationType.summer,
+        vacation_year=date.today().year,
+        status=TargetStatus.active,
     )
     db.add(target)
     await db.flush()
@@ -43,9 +51,13 @@ async def test_generate_plan_deactivates_prior_active_plan(db, pupil_with_target
 
     # Create an existing active plan manually
     old_plan = Plan(
-        target_id=target.id, title="Old Plan", overview="",
-        start_date=today, end_date=today + timedelta(days=6),
-        total_weeks=1, status=PlanStatus.active,
+        target_id=target.id,
+        title="Old Plan",
+        overview="",
+        start_date=today,
+        end_date=today + timedelta(days=6),
+        total_weeks=1,
+        status=PlanStatus.active,
     )
     db.add(old_plan)
     await db.flush()
@@ -63,10 +75,12 @@ async def test_generate_plan_deactivates_prior_active_plan(db, pupil_with_target
         new_callable=AsyncMock,
         return_value=(
             __import__("json").dumps(fake_plan_data),
-            10, 20,
+            10,
+            20,
         ),
     ):
         from app.services.plan_generator import generate_plan
+
         new_plan = await generate_plan(
             db=db,
             target=target,
@@ -98,15 +112,26 @@ async def test_only_one_active_plan_after_generate(db, pupil_with_target):
         return_value=(__import__("json").dumps(fake_plan_data), 5, 10),
     ):
         from app.services.plan_generator import generate_plan
+
         await generate_plan(
-            db=db, target=target, pupil_name=pupil.name, grade=pupil.grade,
-            start_date=today, end_date=today + timedelta(days=6),
-            daily_study_minutes=60, preferred_days=[0],
+            db=db,
+            target=target,
+            pupil_name=pupil.name,
+            grade=pupil.grade,
+            start_date=today,
+            end_date=today + timedelta(days=6),
+            daily_study_minutes=60,
+            preferred_days=[0],
         )
         await generate_plan(
-            db=db, target=target, pupil_name=pupil.name, grade=pupil.grade,
-            start_date=today + timedelta(days=7), end_date=today + timedelta(days=13),
-            daily_study_minutes=60, preferred_days=[0],
+            db=db,
+            target=target,
+            pupil_name=pupil.name,
+            grade=pupil.grade,
+            start_date=today + timedelta(days=7),
+            end_date=today + timedelta(days=13),
+            daily_study_minutes=60,
+            preferred_days=[0],
         )
 
     active_plan = await crud_plan.get_active_for_pupil(db, pupil.id)
@@ -114,6 +139,7 @@ async def test_only_one_active_plan_after_generate(db, pupil_with_target):
 
     from sqlalchemy import select
     from app.models.target import Target as T
+
     result = await db.execute(
         select(Plan)
         .join(T, Plan.target_id == T.id)

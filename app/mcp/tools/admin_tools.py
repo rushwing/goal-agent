@@ -1,4 +1,5 @@
 """Admin MCP tools: manage pupils and parents (role: admin)."""
+
 from typing import Optional
 
 from app.database import AsyncSessionLocal
@@ -65,8 +66,11 @@ async def update_pupil(
         if not pupil:
             raise ValueError(f"Pupil {pupil_id} not found")
         schema = PupilUpdate(
-            name=name, display_name=display_name, grade=grade,
-            telegram_chat_id=telegram_chat_id, is_active=is_active
+            name=name,
+            display_name=display_name,
+            grade=grade,
+            telegram_chat_id=telegram_chat_id,
+            is_active=is_active,
         )
         pupil = await crud_pupil.update(db, db_obj=pupil, obj_in=schema)
         await db.commit()
@@ -179,6 +183,11 @@ async def list_parents(
         await require_role(db, caller_id, [Role.admin])
         parents = await crud_parent.get_multi(db)
         return [
-            {"id": p.id, "name": p.name, "telegram_chat_id": p.telegram_chat_id, "is_admin": p.is_admin}
+            {
+                "id": p.id,
+                "name": p.name,
+                "telegram_chat_id": p.telegram_chat_id,
+                "is_admin": p.is_admin,
+            }
             for p in parents
         ]

@@ -1,4 +1,5 @@
 """Unit tests for app.auth.hmac_auth.verify_request_signature (Issue #3)."""
+
 import hashlib
 import hmac
 import time

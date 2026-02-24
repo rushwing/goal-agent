@@ -8,6 +8,7 @@ Uses unittest.mock to isolate every external dependency:
 
 No real Telegram API calls and no DB connection are made.
 """
+
 from __future__ import annotations
 
 from datetime import date

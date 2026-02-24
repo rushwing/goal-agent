@@ -8,6 +8,7 @@ Headers expected:
 
 Replay protection: ±300 s timestamp window (stateless, no nonce DB).
 """
+
 import hashlib
 import hmac
 import time

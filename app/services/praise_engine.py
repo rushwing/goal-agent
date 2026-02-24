@@ -1,4 +1,5 @@
 """Praise engine: LLM-generated encouragement with offline template fallback."""
+
 import logging
 import random
 from typing import Optional

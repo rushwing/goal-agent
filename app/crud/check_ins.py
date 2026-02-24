@@ -18,9 +18,7 @@ class CRUDCheckIn(CRUDBase[CheckIn, CheckInCreate, CheckInResponse]):
         self, db: AsyncSession, task_id: int, pupil_id: int
     ) -> Optional[CheckIn]:
         result = await db.execute(
-            select(CheckIn).where(
-                CheckIn.task_id == task_id, CheckIn.pupil_id == pupil_id
-            )
+            select(CheckIn).where(CheckIn.task_id == task_id, CheckIn.pupil_id == pupil_id)
         )
         return result.scalar_one_or_none()
 
@@ -40,9 +38,7 @@ class CRUDCheckIn(CRUDBase[CheckIn, CheckInCreate, CheckInResponse]):
         )
         return result.scalars().all()
 
-    async def count_completed_today(
-        self, db: AsyncSession, pupil_id: int, today: date
-    ) -> int:
+    async def count_completed_today(self, db: AsyncSession, pupil_id: int, today: date) -> int:
         result = await db.execute(
             select(func.count(CheckIn.id))
             .join(Task, CheckIn.task_id == Task.id)

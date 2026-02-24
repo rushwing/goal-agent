@@ -17,6 +17,7 @@ Graceful degradation: start_student_bot() is only called from main.py when
 TELEGRAM_PUPIL_BOT_TOKEN is non-empty, so this module is never imported in
 environments where the token is absent.
 """
+
 from __future__ import annotations
 
 import logging
@@ -106,9 +107,7 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         InlineKeyboardButton(
                             f"✅ Done #{task.id}", callback_data=f"done:{task.id}"
                         ),
-                        InlineKeyboardButton(
-                            f"⏭ Skip #{task.id}", callback_data=f"skip:{task.id}"
-                        ),
+                        InlineKeyboardButton(f"⏭ Skip #{task.id}", callback_data=f"skip:{task.id}"),
                     ]
                 )
 
@@ -327,11 +326,7 @@ async def start_student_bot() -> None:
         logger.info("TELEGRAM_PUPIL_BOT_TOKEN not set – student bot not started")
         return
 
-    app = (
-        Application.builder()
-        .token(token)
-        .build()
-    )
+    app = Application.builder().token(token).build()
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("today", cmd_today))
@@ -348,6 +343,7 @@ async def start_student_bot() -> None:
         # Run until the task is cancelled
         try:
             import asyncio
+
             while True:
                 await asyncio.sleep(3600)
         finally:

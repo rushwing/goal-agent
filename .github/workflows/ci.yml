@@ -34,9 +34,8 @@ jobs:
       - name: Run linter
         run: uv run ruff check app tests alembic
 
-      # Format check disabled - pre-existing formatting issues in codebase
-      # - name: Check formatting
-      #   run: uv run ruff format --check app tests alembic
+      - name: Check formatting
+        run: uv run ruff format --check app tests alembic
 
   test:
     name: Test

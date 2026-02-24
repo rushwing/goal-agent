@@ -11,9 +11,7 @@ if TYPE_CHECKING:
 
 class Achievement(Base, TimestampMixin):
     __tablename__ = "achievements"
-    __table_args__ = (
-        UniqueConstraint("pupil_id", "badge_key", name="uq_achievement_pupil_badge"),
-    )
+    __table_args__ = (UniqueConstraint("pupil_id", "badge_key", name="uq_achievement_pupil_badge"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     pupil_id: Mapped[int] = mapped_column(Integer, ForeignKey("pupils.id"), nullable=False)

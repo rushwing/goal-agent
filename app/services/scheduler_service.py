@@ -1,4 +1,5 @@
 """APScheduler cron jobs (runs in-process with single uvicorn worker)."""
+
 import logging
 from datetime import date, timedelta
 
@@ -29,8 +30,7 @@ async def _send_daily_tasks():
             for i, task in enumerate(tasks, 1):
                 opt = " _(optional)_" if task.is_optional else ""
                 lines.append(
-                    f"{i}. *{task.title}*{opt} — {task.estimated_minutes} min "
-                    f"({task.xp_reward} XP)"
+                    f"{i}. *{task.title}*{opt} — {task.estimated_minutes} min ({task.xp_reward} XP)"
                 )
             lines.append("\nUse /checkin to mark tasks complete. You've got this! 🌟")
             await telegram_service.send_to_pupil(pupil.telegram_chat_id, "\n".join(lines))
@@ -57,9 +57,7 @@ async def _send_evening_reminders():
                 for task in unchecked:
                     lines.append(f"- {task.title} ({task.estimated_minutes} min)")
                 lines.append("\nThere's still time! Check them off to keep your streak alive. 🔥")
-                await telegram_service.send_to_pupil(
-                    pupil.telegram_chat_id, "\n".join(lines)
-                )
+                await telegram_service.send_to_pupil(pupil.telegram_chat_id, "\n".join(lines))
 
             # Generate daily report
             try:

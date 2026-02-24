@@ -1,4 +1,5 @@
 """Aggregates all v1 routers."""
+
 from fastapi import APIRouter
 from app.api.v1.admin import router as admin_router
 from app.api.v1.plans import router as plans_router

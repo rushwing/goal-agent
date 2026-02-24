@@ -1,4 +1,5 @@
 """Plan and target endpoints."""
+
 from datetime import date
 from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -104,11 +105,13 @@ async def generate_plan(
 
     from app.mcp.tools.plan_tools import _plan_to_markdown
 
-    full_plan = (await db.execute(
-        select(Plan)
-        .options(selectinload(Plan.milestones).selectinload(WeeklyMilestone.tasks))
-        .where(Plan.id == plan.id)
-    )).scalar_one()
+    full_plan = (
+        await db.execute(
+            select(Plan)
+            .options(selectinload(Plan.milestones).selectinload(WeeklyMilestone.tasks))
+            .where(Plan.id == plan.id)
+        )
+    ).scalar_one()
 
     md = _plan_to_markdown(full_plan, pupil.name, target)
     try:

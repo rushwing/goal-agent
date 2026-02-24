@@ -1,4 +1,5 @@
 """Check-in endpoints for pupils."""
+
 from datetime import date
 from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
@@ -24,18 +25,21 @@ async def get_today_tasks(
         raise HTTPException(403, "Pupil role required")
     pupil = await crud_pupil.get_by_chat_id(db, chat_id)
     from app.crud.tasks import crud_task
+
     tasks = await crud_task.get_tasks_for_day(db, pupil.id, date.today())
     result = []
     for task in tasks:
         ci = await crud_check_in.get_by_task_and_pupil(db, task.id, pupil.id)
-        result.append({
-            "id": task.id,
-            "title": task.title,
-            "estimated_minutes": task.estimated_minutes,
-            "xp_reward": task.xp_reward,
-            "is_optional": task.is_optional,
-            "status": ci.status.value if ci else "pending",
-        })
+        result.append(
+            {
+                "id": task.id,
+                "title": task.title,
+                "estimated_minutes": task.estimated_minutes,
+                "xp_reward": task.xp_reward,
+                "is_optional": task.is_optional,
+                "status": ci.status.value if ci else "pending",
+            }
+        )
     return result
 
 
@@ -62,19 +66,29 @@ async def checkin_task(
         return {"already_checked_in": True}
 
     xp_result = await streak_service.update_streak_and_xp(
-        db=db, pupil=pupil, base_xp=task.xp_reward,
-        mood_score=body.mood_score, check_in_date=date.today(),
+        db=db,
+        pupil=pupil,
+        base_xp=task.xp_reward,
+        mood_score=body.mood_score,
+        check_in_date=date.today(),
     )
     praise = await praise_engine.generate_praise(
-        display_name=pupil.display_name, task_title=task.title,
-        mood_score=body.mood_score, streak=xp_result.new_streak,
-        grade=pupil.grade, badges_earned=xp_result.badges_earned,
+        display_name=pupil.display_name,
+        task_title=task.title,
+        mood_score=body.mood_score,
+        streak=xp_result.new_streak,
+        grade=pupil.grade,
+        badges_earned=xp_result.badges_earned,
     )
     ci = CheckIn(
-        task_id=body.task_id, pupil_id=pupil.id,
-        status=CheckInStatus.completed, mood_score=body.mood_score,
-        duration_minutes=body.duration_minutes, notes=body.notes,
-        xp_earned=xp_result.xp_earned, streak_at_checkin=xp_result.new_streak,
+        task_id=body.task_id,
+        pupil_id=pupil.id,
+        status=CheckInStatus.completed,
+        mood_score=body.mood_score,
+        duration_minutes=body.duration_minutes,
+        notes=body.notes,
+        xp_earned=xp_result.xp_earned,
+        streak_at_checkin=xp_result.new_streak,
         praise_message=praise,
     )
     db.add(ci)
@@ -110,9 +124,12 @@ async def skip_task(
     if existing:
         return {"already_recorded": True}
     ci = CheckIn(
-        task_id=body.task_id, pupil_id=pupil.id,
-        status=CheckInStatus.skipped, skip_reason=body.reason,
-        xp_earned=0, streak_at_checkin=pupil.streak_current,
+        task_id=body.task_id,
+        pupil_id=pupil.id,
+        status=CheckInStatus.skipped,
+        skip_reason=body.reason,
+        xp_earned=0,
+        streak_at_checkin=pupil.streak_current,
     )
     db.add(ci)
     await db.flush()

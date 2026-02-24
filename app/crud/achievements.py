@@ -10,9 +10,7 @@ from app.schemas.achievement import AchievementResponse
 
 class CRUDAchievement(CRUDBase[Achievement, AchievementResponse, AchievementResponse]):
     async def get_by_pupil(self, db: AsyncSession, pupil_id: int) -> Sequence[Achievement]:
-        result = await db.execute(
-            select(Achievement).where(Achievement.pupil_id == pupil_id)
-        )
+        result = await db.execute(select(Achievement).where(Achievement.pupil_id == pupil_id))
         return result.scalars().all()
 
     async def get_by_badge(

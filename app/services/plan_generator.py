@@ -1,4 +1,5 @@
 """LLM-powered vacation study plan generator."""
+
 import json
 import logging
 from datetime import date, timedelta
@@ -97,8 +98,14 @@ async def generate_plan(
     Call Kimi to generate a structured plan, persist to DB, return Plan object.
     """
     user_prompt = _build_user_prompt(
-        target, pupil_name, grade, start_date, end_date,
-        daily_study_minutes, preferred_days, extra_instructions
+        target,
+        pupil_name,
+        grade,
+        start_date,
+        end_date,
+        daily_study_minutes,
+        preferred_days,
+        extra_instructions,
     )
 
     plan_data: dict[str, Any] | None = None
@@ -129,6 +136,7 @@ async def generate_plan(
 
     # Deactivate any existing active plans for this pupil (single-active-plan invariant)
     from sqlalchemy import select as _select
+
     existing_active = await db.execute(
         _select(Plan)
         .join(Target, Plan.target_id == Target.id)

@@ -1,4 +1,5 @@
 """Plan MCP tools: targets and AI plan generation (role: parent/admin)."""
+
 import logging
 from datetime import date
 from typing import Optional
@@ -53,7 +54,12 @@ async def create_target(
         )
         target = await crud_target.create(db, obj_in=schema)
         await db.commit()
-        return {"id": target.id, "title": target.title, "subject": target.subject, "pupil_id": target.pupil_id}
+        return {
+            "id": target.id,
+            "title": target.title,
+            "subject": target.subject,
+            "pupil_id": target.pupil_id,
+        }
 
 
 @mcp.tool()
@@ -74,8 +80,11 @@ async def update_target(
         if not target:
             raise ValueError(f"Target {target_id} not found")
         schema = TargetUpdate(
-            title=title, subject=subject, description=description,
-            priority=priority, status=TargetStatus(status) if status else None,
+            title=title,
+            subject=subject,
+            description=description,
+            priority=priority,
+            status=TargetStatus(status) if status else None,
         )
         target = await crud_target.update(db, db_obj=target, obj_in=schema)
         await db.commit()
@@ -170,8 +179,7 @@ async def generate_plan(
 
         try:
             sha, path = await github_service.commit_plan(
-                pupil.name, target.vacation_type.value, target.vacation_year,
-                plan.title, md
+                pupil.name, target.vacation_type.value, target.vacation_year, plan.title, md
             )
             plan.github_commit_sha = sha
             plan.github_file_path = path
@@ -240,6 +248,7 @@ async def update_plan(
         if not plan:
             raise ValueError(f"Plan {plan_id} not found")
         from app.models.plan import PlanStatus
+
         schema = PlanUpdate(
             title=title,
             status=PlanStatus(status) if status else None,
@@ -280,8 +289,13 @@ async def list_plans(
         else:
             plans = await crud_plan.get_multi(db)
         return [
-            {"id": p.id, "title": p.title, "status": p.status.value,
-             "start_date": str(p.start_date), "end_date": str(p.end_date)}
+            {
+                "id": p.id,
+                "title": p.title,
+                "status": p.status.value,
+                "start_date": str(p.start_date),
+                "end_date": str(p.end_date),
+            }
             for p in plans
         ]
 
@@ -313,8 +327,13 @@ async def get_plan_detail(
                     "total_tasks": ms.total_tasks,
                     "completed_tasks": ms.completed_tasks,
                     "tasks": [
-                        {"id": t.id, "title": t.title, "day_of_week": t.day_of_week,
-                         "estimated_minutes": t.estimated_minutes, "xp_reward": t.xp_reward}
+                        {
+                            "id": t.id,
+                            "title": t.title,
+                            "day_of_week": t.day_of_week,
+                            "estimated_minutes": t.estimated_minutes,
+                            "xp_reward": t.xp_reward,
+                        }
                         for t in ms.tasks
                     ],
                 }

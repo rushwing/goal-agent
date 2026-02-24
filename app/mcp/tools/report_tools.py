@@ -1,4 +1,5 @@
 """Report MCP tools: generate and list reports (role: parent/admin for any pupil; pupil for own)."""
+
 from datetime import date
 from typing import Optional
 
@@ -19,6 +20,7 @@ def _require_chat_id(chat_id: Optional[int]) -> int:
 async def _resolve_pupil(db, caller_id: int, pupil_id: Optional[int]):
     """Resolve pupil_id: parents can specify any pupil, pupils use their own."""
     from app.models.pupil import Pupil
+
     role = await resolve_role(db, caller_id)
     if role in (Role.admin, Role.parent):
         if pupil_id is None:

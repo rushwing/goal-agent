@@ -1,4 +1,5 @@
 """Unit tests for offline praise templates."""
+
 from app.services.praise_engine import get_offline_praise
 
 

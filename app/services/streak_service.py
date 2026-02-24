@@ -1,4 +1,5 @@
 """Streak and XP logic."""
+
 from datetime import date, timedelta
 from typing import NamedTuple
 
@@ -9,14 +10,14 @@ from app.models.achievement import Achievement
 
 
 BADGE_CATALOGUE = {
-    "first_checkin":   ("First Step!", "🌟", 10),
-    "streak_3":        ("3-Day Streak!", "🔥", 15),
-    "streak_7":        ("Week Warrior!", "🦁", 30),
-    "streak_14":       ("Fortnight Champion!", "🏆", 75),
-    "streak_30":       ("Monthly Master!", "👑", 200),
-    "xp_50":           ("50 XP Club!", "⭐", 5),
-    "xp_100":          ("Century Scholar!", "💯", 10),
-    "xp_500":          ("XP Legend!", "🎖️", 50),
+    "first_checkin": ("First Step!", "🌟", 10),
+    "streak_3": ("3-Day Streak!", "🔥", 15),
+    "streak_7": ("Week Warrior!", "🦁", 30),
+    "streak_14": ("Fortnight Champion!", "🏆", 75),
+    "streak_30": ("Monthly Master!", "👑", 200),
+    "xp_50": ("50 XP Club!", "⭐", 5),
+    "xp_100": ("Century Scholar!", "💯", 10),
+    "xp_500": ("XP Legend!", "🎖️", 50),
     "weekend_warrior": ("Weekend Warrior!", "🏄", 20),
 }
 

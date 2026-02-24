@@ -1,4 +1,5 @@
 """Tests for issue #1: check-in task ownership and date eligibility validation."""
+
 from datetime import date, timedelta
 
 import pytest
@@ -18,6 +19,7 @@ from app.crud.tasks import crud_task
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _monday_of_current_week() -> date:
     today = date.today()
     return today - timedelta(days=today.weekday())
@@ -31,12 +33,18 @@ async def family(db):
     await db.flush()
 
     pupil_a = Pupil(
-        parent_id=parent.id, name="Alice", display_name="Alice",
-        grade="5", telegram_chat_id=2001,
+        parent_id=parent.id,
+        name="Alice",
+        display_name="Alice",
+        grade="5",
+        telegram_chat_id=2001,
     )
     pupil_b = Pupil(
-        parent_id=parent.id, name="Bob", display_name="Bob",
-        grade="5", telegram_chat_id=2002,
+        parent_id=parent.id,
+        name="Bob",
+        display_name="Bob",
+        grade="5",
+        telegram_chat_id=2002,
     )
     db.add_all([pupil_a, pupil_b])
     await db.flush()
@@ -47,25 +55,38 @@ async def family(db):
 
     for pupil in (pupil_a, pupil_b):
         target = Target(
-            pupil_id=pupil.id, title="Math", subject="Math",
-            description="", vacation_type=VacationType.summer,
-            vacation_year=today.year, status=TargetStatus.active,
+            pupil_id=pupil.id,
+            title="Math",
+            subject="Math",
+            description="",
+            vacation_type=VacationType.summer,
+            vacation_year=today.year,
+            status=TargetStatus.active,
         )
         db.add(target)
         await db.flush()
 
         plan = Plan(
-            target_id=target.id, title="Plan", overview="",
-            start_date=week_start, end_date=week_end,
-            total_weeks=1, status=PlanStatus.active,
+            target_id=target.id,
+            title="Plan",
+            overview="",
+            start_date=week_start,
+            end_date=week_end,
+            total_weeks=1,
+            status=PlanStatus.active,
         )
         db.add(plan)
         await db.flush()
 
         milestone = WeeklyMilestone(
-            plan_id=plan.id, week_number=1, title="W1", description="",
-            start_date=week_start, end_date=week_end,
-            total_tasks=1, completed_tasks=0,
+            plan_id=plan.id,
+            week_number=1,
+            title="W1",
+            description="",
+            start_date=week_start,
+            end_date=week_end,
+            total_tasks=1,
+            completed_tasks=0,
         )
         db.add(milestone)
         await db.flush()
@@ -74,8 +95,12 @@ async def family(db):
             milestone_id=milestone.id,
             day_of_week=today.weekday(),
             sequence_in_day=1,
-            title="Task", description="", estimated_minutes=30,
-            xp_reward=10, task_type=TaskType.practice, is_optional=False,
+            title="Task",
+            description="",
+            estimated_minutes=30,
+            xp_reward=10,
+            task_type=TaskType.practice,
+            is_optional=False,
         )
         db.add(task)
 

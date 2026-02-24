@@ -1,4 +1,5 @@
 """GitHub integration: auto-commit plans and reports as Markdown."""
+
 import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
@@ -20,9 +21,7 @@ def _get_repo() -> Repository:
     return g.get_repo(settings.GITHUB_DATA_REPO)
 
 
-def _upsert_file_sync(
-    file_path: str, content: str, commit_message: str
-) -> tuple[str, str]:
+def _upsert_file_sync(file_path: str, content: str, commit_message: str) -> tuple[str, str]:
     """
     Create or update a file in the GitHub data repo.
     Returns (commit_sha, file_path).
@@ -56,9 +55,7 @@ def _upsert_file_sync(
     return commit_sha, file_path
 
 
-async def upsert_file(
-    file_path: str, content: str, commit_message: str
-) -> tuple[str, str]:
+async def upsert_file(file_path: str, content: str, commit_message: str) -> tuple[str, str]:
     """Async wrapper – runs sync PyGithub call in thread pool."""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(

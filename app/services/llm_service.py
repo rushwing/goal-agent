@@ -1,4 +1,5 @@
 """Kimi AI (Moonshot) LLM client – OpenAI-compatible."""
+
 import asyncio
 import logging
 from typing import Any, Optional
@@ -69,7 +70,7 @@ async def chat_complete(
             logger.warning("Kimi API error (attempt %d): %s", attempt + 1, exc)
             last_exc = exc
             if attempt < retries - 1:
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
     raise RuntimeError(f"Kimi API failed after {retries} attempts: {last_exc}")
 

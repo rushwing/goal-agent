@@ -1,4 +1,5 @@
 """Generate daily/weekly/monthly Markdown reports using LLM."""
+
 import logging
 from datetime import date, timedelta
 from typing import Optional
@@ -20,8 +21,7 @@ async def _fetch_check_ins(
 ) -> list[CheckIn]:
     """Fetch check-ins by actual event date (created_at), not milestone coverage."""
     result = await db.execute(
-        select(CheckIn)
-        .where(
+        select(CheckIn).where(
             CheckIn.pupil_id == pupil_id,
             func.date(CheckIn.created_at) >= start,
             func.date(CheckIn.created_at) <= end,
@@ -84,12 +84,8 @@ async def _generate_content(
         return _fallback_report(pupil_name, report_type, period_label, stats)
 
 
-def _fallback_report(
-    pupil_name: str, report_type: str, period_label: str, stats: dict
-) -> str:
-    completion_pct = (
-        round(stats["completed"] / stats["total"] * 100) if stats["total"] > 0 else 0
-    )
+def _fallback_report(pupil_name: str, report_type: str, period_label: str, stats: dict) -> str:
+    completion_pct = round(stats["completed"] / stats["total"] * 100) if stats["total"] > 0 else 0
     return (
         f"# {report_type.capitalize()} Report – {pupil_name}\n\n"
         f"**Period:** {period_label}\n\n"
@@ -106,7 +102,12 @@ async def generate_daily_report(
     report_date = report_date or date.today()
     existing = await crud_report.get_existing(db, pupil.id, ReportType.daily, report_date)
     if existing:
-        logger.info("Daily report for pupil %d on %s already exists (id=%d), reusing", pupil.id, report_date, existing.id)
+        logger.info(
+            "Daily report for pupil %d on %s already exists (id=%d), reusing",
+            pupil.id,
+            report_date,
+            existing.id,
+        )
         return existing
     check_ins = await _fetch_check_ins(db, pupil.id, report_date, report_date)
     stats = _build_stats(check_ins)
@@ -151,7 +152,12 @@ async def generate_weekly_report(
     week_end = week_start + timedelta(days=6)
     existing = await crud_report.get_existing(db, pupil.id, ReportType.weekly, week_start)
     if existing:
-        logger.info("Weekly report for pupil %d week_start=%s already exists (id=%d), reusing", pupil.id, week_start, existing.id)
+        logger.info(
+            "Weekly report for pupil %d week_start=%s already exists (id=%d), reusing",
+            pupil.id,
+            week_start,
+            existing.id,
+        )
         return existing
     check_ins = await _fetch_check_ins(db, pupil.id, week_start, week_end)
     stats = _build_stats(check_ins)
@@ -202,7 +208,13 @@ async def generate_monthly_report(
 
     existing = await crud_report.get_existing(db, pupil.id, ReportType.monthly, period_start)
     if existing:
-        logger.info("Monthly report for pupil %d %d-%02d already exists (id=%d), reusing", pupil.id, year, month, existing.id)
+        logger.info(
+            "Monthly report for pupil %d %d-%02d already exists (id=%d), reusing",
+            pupil.id,
+            year,
+            month,
+            existing.id,
+        )
         return existing
     check_ins = await _fetch_check_ins(db, pupil.id, period_start, period_end)
     stats = _build_stats(check_ins)

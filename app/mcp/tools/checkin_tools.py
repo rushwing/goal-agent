@@ -1,4 +1,5 @@
 """Check-in MCP tools: task completion, streak, XP (role: pupil)."""
+
 from datetime import date, timedelta
 from typing import Optional
 
@@ -30,16 +31,18 @@ async def list_today_tasks(
         result = []
         for task in tasks:
             ci = await crud_check_in.get_by_task_and_pupil(db, task.id, pupil.id)
-            result.append({
-                "id": task.id,
-                "title": task.title,
-                "description": task.description,
-                "estimated_minutes": task.estimated_minutes,
-                "xp_reward": task.xp_reward,
-                "task_type": task.task_type.value,
-                "is_optional": task.is_optional,
-                "status": ci.status.value if ci else "pending",
-            })
+            result.append(
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "description": task.description,
+                    "estimated_minutes": task.estimated_minutes,
+                    "xp_reward": task.xp_reward,
+                    "task_type": task.task_type.value,
+                    "is_optional": task.is_optional,
+                    "status": ci.status.value if ci else "pending",
+                }
+            )
         return result
 
 
@@ -60,14 +63,16 @@ async def list_week_tasks(
         result = []
         for task in tasks:
             ci = await crud_check_in.get_by_task_and_pupil(db, task.id, pupil.id)
-            result.append({
-                "id": task.id,
-                "title": task.title,
-                "day": day_names[task.day_of_week],
-                "estimated_minutes": task.estimated_minutes,
-                "xp_reward": task.xp_reward,
-                "status": ci.status.value if ci else "pending",
-            })
+            result.append(
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "day": day_names[task.day_of_week],
+                    "estimated_minutes": task.estimated_minutes,
+                    "xp_reward": task.xp_reward,
+                    "status": ci.status.value if ci else "pending",
+                }
+            )
         return result
 
 
@@ -143,6 +148,7 @@ async def checkin_task(
         # Update milestone completion count
         from sqlalchemy import select, update
         from app.models.weekly_milestone import WeeklyMilestone
+
         await db.execute(
             update(WeeklyMilestone)
             .where(WeeklyMilestone.id == task.milestone_id)
@@ -213,9 +219,6 @@ async def get_pupil_progress(
             "xp_total": pupil.xp_total,
             "active_plan_title": active_plan.title if active_plan else None,
             "recent_achievements": [
-                {"badge": a.badge_icon, "name": a.badge_name}
-                for a in achievements[-5:]
+                {"badge": a.badge_icon, "name": a.badge_name} for a in achievements[-5:]
             ],
         }
-
-

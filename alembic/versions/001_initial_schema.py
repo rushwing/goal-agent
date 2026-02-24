@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-02-23 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -190,9 +191,7 @@ def upgrade() -> None:
         "reports",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("pupil_id", sa.Integer(), nullable=False),
-        sa.Column(
-            "report_type", sa.Enum("daily", "weekly", "monthly"), nullable=False
-        ),
+        sa.Column("report_type", sa.Enum("daily", "weekly", "monthly"), nullable=False),
         sa.Column("period_start", sa.Date(), nullable=False),
         sa.Column("period_end", sa.Date(), nullable=False),
         sa.Column("content_md", sa.Text(16777215), nullable=False),  # MEDIUMTEXT
@@ -233,9 +232,7 @@ def upgrade() -> None:
     op.create_table(
         "notifications",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column(
-            "recipient_type", sa.Enum("pupil", "parent", "group"), nullable=False
-        ),
+        sa.Column("recipient_type", sa.Enum("pupil", "parent", "group"), nullable=False),
         sa.Column("recipient_id", sa.Integer(), nullable=True),
         sa.Column(
             "channel",

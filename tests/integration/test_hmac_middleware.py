@@ -3,6 +3,7 @@
 Tests exercise the full HTTP stack via ASGI test client.
 The middleware only fires on requests that carry X-Telegram-Chat-Id.
 """
+
 import hashlib
 import hmac
 import time

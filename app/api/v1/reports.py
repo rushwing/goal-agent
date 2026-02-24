@@ -1,4 +1,5 @@
 """Report endpoints."""
+
 from datetime import date
 from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException

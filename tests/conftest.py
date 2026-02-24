@@ -1,4 +1,5 @@
 """Pytest fixtures for unit and integration tests."""
+
 import asyncio
 from typing import AsyncGenerator
 
@@ -34,9 +35,7 @@ async def test_engine():
 
 @pytest_asyncio.fixture
 async def db(test_engine) -> AsyncGenerator[AsyncSession, None]:
-    TestSession = async_sessionmaker(
-        bind=test_engine, class_=AsyncSession, expire_on_commit=False
-    )
+    TestSession = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
     async with TestSession() as session:
         yield session
         await session.rollback()
@@ -46,8 +45,6 @@ async def db(test_engine) -> AsyncGenerator[AsyncSession, None]:
 async def client(db) -> AsyncGenerator[AsyncClient, None]:
     """HTTP test client with DB override."""
     app.dependency_overrides[get_db] = lambda: db
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()

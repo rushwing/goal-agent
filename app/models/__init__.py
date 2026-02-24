@@ -8,7 +8,13 @@ from app.models.task import Task, TaskType
 from app.models.check_in import CheckIn, CheckInStatus
 from app.models.report import Report, ReportType
 from app.models.achievement import Achievement
-from app.models.notification import Notification, RecipientType, NotificationChannel, NotificationType, NotificationStatus
+from app.models.notification import (
+    Notification,
+    RecipientType,
+    NotificationChannel,
+    NotificationType,
+    NotificationStatus,
+)
 
 __all__ = [
     "Base",

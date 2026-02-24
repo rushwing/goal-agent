@@ -8,6 +8,7 @@ Bootstrap note: existing pupils will have parent_id=NULL. Admins should assign
 parent_id values via the admin API or directly in the DB before enforcing
 ownership in a multi-family deployment.
 """
+
 from typing import Sequence, Union
 
 from alembic import op

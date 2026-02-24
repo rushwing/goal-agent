@@ -1,4 +1,5 @@
 """Tests for issue #2: parent-pupil ownership model."""
+
 import pytest
 import pytest_asyncio
 
@@ -19,15 +20,21 @@ async def two_families(db):
     pupil_a = await crud_pupil.create(
         db,
         obj_in=PupilCreate(
-            name="Alice", display_name="Alice", grade="5",
-            telegram_chat_id=4001, parent_id=parent_a.id,
+            name="Alice",
+            display_name="Alice",
+            grade="5",
+            telegram_chat_id=4001,
+            parent_id=parent_a.id,
         ),
     )
     pupil_b = await crud_pupil.create(
         db,
         obj_in=PupilCreate(
-            name="Bob", display_name="Bob", grade="6",
-            telegram_chat_id=4002, parent_id=parent_b.id,
+            name="Bob",
+            display_name="Bob",
+            grade="6",
+            telegram_chat_id=4002,
+            parent_id=parent_b.id,
         ),
     )
     return parent_a, parent_b, pupil_a, pupil_b
@@ -65,7 +72,9 @@ async def test_pupil_without_parent_id(db):
     pupil = await crud_pupil.create(
         db,
         obj_in=PupilCreate(
-            name="Orphan", display_name="Orphan", grade="3",
+            name="Orphan",
+            display_name="Orphan",
+            grade="3",
             telegram_chat_id=5999,
         ),
     )

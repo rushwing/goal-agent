@@ -1,4 +1,5 @@
 """FastMCP server instance – mounted inside FastAPI."""
+
 from fastmcp import FastMCP
 
 mcp = FastMCP(

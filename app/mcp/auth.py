@@ -1,4 +1,5 @@
 """MCP role-based auth: resolves X-Telegram-Chat-Id to admin/parent/pupil."""
+
 import logging
 from enum import Enum
 from typing import Optional

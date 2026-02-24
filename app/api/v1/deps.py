@@ -1,4 +1,5 @@
 """FastAPI dependencies."""
+
 from typing import Annotated, Optional
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +7,9 @@ from app.database import get_db
 from app.mcp.auth import resolve_role, Role, AuthError
 
 
-async def get_chat_id(x_telegram_chat_id: Annotated[Optional[int], Header()] = None) -> Optional[int]:
+async def get_chat_id(
+    x_telegram_chat_id: Annotated[Optional[int], Header()] = None,
+) -> Optional[int]:
     return x_telegram_chat_id
 
 
@@ -57,6 +60,7 @@ async def verify_parent_owns_pupil(
         return
     from app.crud.pupils import crud_pupil
     from app.crud.parents import crud_parent
+
     parent = await crud_parent.get_by_chat_id(db, chat_id)
     if not parent:
         raise HTTPException(status_code=403, detail="Parent not found")

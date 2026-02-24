@@ -1,10 +1,17 @@
 """Notification persistence and dispatch."""
+
 import logging
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.notification import Notification, NotificationStatus, RecipientType, NotificationChannel, NotificationType
+from app.models.notification import (
+    Notification,
+    NotificationStatus,
+    RecipientType,
+    NotificationChannel,
+    NotificationType,
+)
 from app.services import telegram_service
 
 logger = logging.getLogger(__name__)

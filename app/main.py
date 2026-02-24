@@ -1,4 +1,5 @@
 """FastAPI application entry point with FastMCP mounted and APScheduler."""
+
 import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
@@ -45,9 +46,7 @@ class HmacMiddleware(BaseHTTPMiddleware):
             request.headers.get("x-signature"),
         )
         if not ok:
-            return JSONResponse(
-                {"detail": "Invalid request signature"}, status_code=401
-            )
+            return JSONResponse({"detail": "Invalid request signature"}, status_code=401)
         return await call_next(request)
 
 
