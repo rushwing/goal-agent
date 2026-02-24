@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "repository": "rushwing/vocation_study_planner",
   "workers": [
     "claude",
@@ -22,11 +22,11 @@
     ],
     "queue": [
       "queue:ready-impl",
-      "queue:claimed",
+      "queue:impl-active",
       "queue:in-pr",
-      "queue:ready-review",
-      "queue:blocked",
+      "queue:review-active",
       "queue:needs-human",
+      "queue:blocked",
       "queue:done"
     ]
   },
@@ -34,24 +34,55 @@
     "exactly_one_queue_label": true,
     "default_lease_hours": 24,
     "do_not_claim_if_labels_present": [
-      "queue:claimed",
-      "queue:in-pr"
+      "queue:impl-active",
+      "queue:review-active"
     ]
+  },
+  "transitions": {
+    "queue:ready-impl":    ["queue:impl-active"],
+    "queue:impl-active":   ["queue:in-pr", "queue:needs-human", "queue:blocked"],
+    "queue:in-pr":         ["queue:review-active"],
+    "queue:review-active": ["queue:done", "queue:ready-impl", "queue:in-pr", "queue:needs-human"],
+    "queue:needs-human":   ["queue:ready-impl", "queue:in-pr"],
+    "queue:blocked":       ["queue:ready-impl"],
+    "queue:done":          []
+  },
+  "transition_notes": {
+    "queue:review-active -> queue:done":       "approved + merged",
+    "queue:review-active -> queue:ready-impl": "changes requested; re-opens for a new impl claim",
+    "queue:review-active -> queue:in-pr":      "reviewer releases claim without a result; back to waiting for reviewer",
+    "queue:review-active -> queue:needs-human":"review blocked on human judgment",
+    "queue:needs-human   -> queue:ready-impl": "human resolved an implementation blocker",
+    "queue:needs-human   -> queue:in-pr":      "human resolved a review-stage blocker",
+    "queue:blocked       -> queue:ready-impl": "upstream dependency resolved"
   },
   "claim_comment": {
     "header": "[bot-claim]",
     "required_fields": [
       "worker",
-      "role",
       "claimed_at",
       "lease_hours"
     ],
     "optional_fields": [
       "branch"
     ],
-    "allowed_roles": [
-      "implementer",
-      "reviewer"
+    "note": "role is now implicit in the queue label (impl-active = implementer, review-active = reviewer) and does not need to be stated in the comment"
+  },
+  "review_comment": {
+    "header": "[bot-review]",
+    "required_fields": [
+      "worker",
+      "reviewed_at",
+      "result",
+      "pr"
+    ],
+    "optional_fields": [
+      "notes"
+    ],
+    "allowed_results": [
+      "approved",
+      "changes_requested",
+      "blocked"
     ]
   },
   "blocked_comment": {
