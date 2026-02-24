@@ -40,12 +40,8 @@ packages = ["app"]
 # ---------------------------------------------------------------------------
 # uv
 # ---------------------------------------------------------------------------
-[tool.uv]
-# Pin the Python version used by `uv venv` / `uv sync`
-python = "3.12"
-
-[tool.uv.sources]
-# (add private index overrides here if needed)
+# Python version is pinned in [project] requires-python = ">=3.12"
+# No additional [tool.uv] config needed for uv >= 0.5.x
 
 # ---------------------------------------------------------------------------
 # pytest
