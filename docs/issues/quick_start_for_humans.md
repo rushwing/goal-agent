@@ -18,15 +18,22 @@ When a new issue is created:
 
 ## Queue Labels (Use Exactly One)
 
-- `queue:ready-impl` : ready to implement
-- `queue:claimed` : a worker is currently working on it
-- `queue:in-pr` : implementation is in a PR
-- `queue:ready-review` : implementation is complete and ready for review
-- `queue:blocked` : cannot proceed yet
-- `queue:needs-human` : a human decision is required
-- `queue:done` : resolved / merged
+| Label | Meaning | Who acts next |
+|---|---|---|
+| `queue:ready-impl` | Unowned; waiting for implementer | LLM implementer |
+| `queue:impl-active` | Implementer claimed; work in progress | LLM implementer |
+| `queue:in-pr` | PR open; waiting for reviewer | LLM reviewer |
+| `queue:review-active` | Reviewer claimed; review in progress | LLM reviewer |
+| `queue:approved` | Review passed; awaiting merge | **Human** merges PR → LLM closes |
+| `queue:needs-human` | Blocked on a human judgment/approval | **Human maintainer** |
+| `queue:blocked` | Blocked on an upstream issue or dependency | Human or upstream worker |
+| `queue:done` | Resolved / merged | — |
 
 Rule: never leave multiple `queue:*` labels on the same issue.
+
+**Merge policy:** LLM workers share the same GitHub account as the repo owner and cannot self-merge. When you see `queue:approved`, your only job is to merge the PR. The LLM handles the rest (label update + close) automatically after detecting the merge.
+
+**Note:** `queue:impl-active` and `queue:review-active` replaced the old `queue:claimed` label. The role is now encoded in the label itself — no need to read comment history to know who should act.
 
 ## How to Choose an Implementer (Capability-Based)
 
@@ -100,13 +107,29 @@ Examples:
 - deciding whether a migration can be breaking
 - approving a tradeoff between speed and safety
 
+After you resolve it, move to:
+- `queue:ready-impl` if the implementation hasn't started yet
+- `queue:in-pr` if the implementation was already in a PR and only the review was blocked
+
+## What to Do When You See `queue:approved`
+
+Your only action as the human maintainer:
+
+1. Read the `[bot-review]` comment to confirm the reviewer's notes
+2. Merge the PR: `gh pr merge <n> --squash` (or via GitHub UI)
+
+That's it. The LLM detects the merge event and automatically sets `queue:done` and closes the issue. You do not need to touch the labels or close the issue manually.
+
 ## Common Mistakes to Avoid
 
 - Assigning two implementers to the same issue
-- Forgetting to remove the old `queue:*` label
-- Marking `queue:ready-review` before implementation is actually stable
+- Forgetting to remove the old `queue:*` label when transitioning
+- Using `queue:impl-active` or `queue:review-active` on an issue nobody has actually claimed
 - Using reviewer labels as if they were implementers
 - Keeping blocked issues without a blocker note
+- Letting an LLM merge a PR — always merge yourself after seeing `queue:approved`
+- Manually setting `queue:done` or closing the issue — let the LLM do it after merge
+- ~~Marking `queue:ready-review`~~ — this label no longer exists; `queue:in-pr` is the signal for reviewers to pick up work
 
 ## Minimal Triage Checklist (Copy/Paste)
 

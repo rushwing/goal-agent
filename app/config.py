@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8000
 
+    # HMAC request signing (Issue #3)
+    # When non-empty, all requests carrying X-Telegram-Chat-Id must include
+    # valid X-Request-Timestamp / X-Nonce / X-Signature headers.
+    # Leave empty in dev/test environments to skip verification.
+    HMAC_SECRET: str = ""
+
     # Bootstrap admin chat IDs (comma-separated)
     ADMIN_CHAT_IDS: str = ""
 

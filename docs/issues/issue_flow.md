@@ -16,7 +16,7 @@ It is intended for human developers and maintainers.
 - One issue should have one primary implementer at a time
 - Reviews should be assigned by risk type (security, data integrity, DX, UX)
 - Use queue states to control flow
-- Prefer capability-based routing over ad hoc assignment
+- **Each queue state has exactly one actor and an unambiguous set of valid next states** — no agent should need to read comment history to decide what to do next
 - Human maintainers own prioritization and merge decisions
 
 ## Capability-Based Assignment Strategy
@@ -53,52 +53,65 @@ Do not assign by model name in this document. Assign by capability profile.
 
 ## Issue Lifecycle (Queue Flow)
 
-Use one queue state at a time.
+Use **exactly one** queue state at a time. The label alone must identify who acts next.
 
 ```text
-                  +----------------------+
-                  |  queue:blocked       |
-                  |  Waiting on decision |
-                  |  or dependency       |
-                  +----------+-----------+
-                             |
-                             | (blocker resolved)
-                             v
-+----------------------+   +----------------------+   claim   +----------------------+
-| New / Triaged Issue  |-->| queue:ready-impl     |---------> | queue:claimed        |
-| (priority + labels)  |   | Ready to implement   |           | Lease active         |
-+----------------------+   +----------------------+           +----------+-----------+
-                                                                          |
-                                                                          | PR opened
-                                                                          v
-                                                               +----------------------+
-                                                               | queue:in-pr          |
-                                                               | Implementation in PR |
-                                                               +----------+-----------+
-                                                                          |
-                                                                          | impl complete,
-                                                                          | reviewer requested
-                                                                          v
-                                                               +----------------------+
-                                                               | queue:ready-review   |
-                                                               | Ready for review      |
-                                                               +----------+-----------+
-                                                                          |
-                                         +--------------------------------+------------------------------+
-                                         |                                                               |
-                                         | review finds blocker / decision needed                         | review passes + merged
-                                         v                                                               v
-                              +----------------------+                                      +----------------------+
-                              | queue:needs-human    |------------------------------------->| queue:done           |
-                              | Human decision needed|  (decision applied / follow-up done)| Resolved / merged    |
-                              +----------+-----------+                                      +----------------------+
-                                         |
-                                         | back to implementation
-                                         v
-                              +----------------------+
-                              | queue:ready-impl     |
-                              +----------------------+
+  queue:blocked ──── blocker resolved ───► queue:ready-impl
+  (waiting on dep)                          (unowned)
+                                               │
+                                    implementer claims
+                                               │
+                                               ▼
+                                      queue:impl-active
+                                       (implementing)
+                                          │       │
+                               PR opened │       │ blocked on
+                                         │       │ decision/dep
+                                         ▼       ▼
+                                    queue:in-pr  queue:needs-human
+                                  (awaiting      (human decides)
+                                   reviewer)        │        │
+                                      │             │        │
+                           reviewer   │    back to  │        │ back to
+                           claims     │    impl     ▼        ▼ review
+                                      │       queue:ready-impl
+                                      ▼       queue:in-pr
+                               queue:review-active
+                                (reviewing)
+                               /      |       \
+                    approved /        |        \ changes
+                            /         |         \ requested
+                           ▼          │          ▼
+                    queue:approved  releases   queue:ready-impl
+                    (human merges;  without     (re-opens for
+                     LLM closes)    result      implementation)
+                         │             │
+                  human  │             ▼
+                  merges;│         queue:in-pr
+                  LLM    ▼        (back to awaiting
+                  closes queue:done    reviewer)
+                         (resolved)
 ```
+
+### Transition table
+
+| From | To | Who acts |
+|---|---|---|
+| `queue:ready-impl` | `queue:impl-active` | LLM implementer claims |
+| `queue:impl-active` | `queue:in-pr` | LLM implementer opens PR |
+| `queue:impl-active` | `queue:needs-human` | LLM implementer hits decision blocker |
+| `queue:impl-active` | `queue:blocked` | LLM implementer hits dependency blocker |
+| `queue:in-pr` | `queue:review-active` | LLM reviewer claims |
+| `queue:review-active` | `queue:approved` | LLM reviewer: review passed |
+| `queue:review-active` | `queue:ready-impl` | LLM reviewer: changes requested |
+| `queue:review-active` | `queue:in-pr` | LLM reviewer: releases claim without result |
+| `queue:review-active` | `queue:needs-human` | LLM reviewer: hits decision blocker |
+| `queue:approved` | `queue:done` | **Human** merges PR → **LLM** sets done + closes issue |
+| `queue:needs-human` | `queue:ready-impl` | **Human: resolved implementation blocker** |
+| `queue:needs-human` | `queue:in-pr` | **Human: resolved review-stage blocker** |
+| `queue:blocked` | `queue:ready-impl` | **Human: upstream dependency resolved** |
+
+> **Merge policy:** LLM workers share the same GitHub account as the repo owner and cannot self-merge. `queue:approved` is the signal for the human to merge. After the human merges, the LLM handles post-merge housekeeping (`queue:approved` → `queue:done` + close issue), ideally triggered by the `pull_request: closed+merged` event.
 
 ## Recommended Triage Steps (Human Maintainer)
 
@@ -143,17 +156,17 @@ Confusing bot flow / wording        UX / wording reviewer
 ## Conflict Avoidance Rules
 
 - Do not let two implementers modify the same issue at the same time
-- A claimed issue should not be re-claimed until lease expires (unless human overrides)
+- An issue with `queue:impl-active` or `queue:review-active` should not be re-claimed until the lease expires (unless human overrides)
 - Reviewers should review first, not rewrite immediately
 - If implementation and review disagree on design semantics, move to `queue:needs-human`
 
 ## Human Decisions That Should Not Be Auto-Delegated
 
+- **All PR merges** — LLM workers share the same GitHub account; merging must always be done by the human
 - Security tradeoffs and trust boundaries
 - Schema migration rollout and data backfill strategy
 - Breaking API changes
 - Priority overrides across issues
-- Merge approval for high-risk changes
 
 ## Practical Examples (Capability Mapping Only)
 
