@@ -20,16 +20,16 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
-      - name: Install dependencies
-        run: uv sync --dev --all-extras
-
       - name: Cache uv packages
         uses: actions/cache@v4
         with:
           path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml', '**/uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --dev --all-extras
 
       - name: Run linter
         run: uv run ruff check app tests alembic
@@ -50,6 +50,14 @@ jobs:
 
       - name: Set up Python
         run: uv python install 3.12
+
+      - name: Cache uv packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml', '**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
 
       - name: Install dependencies
         run: uv sync --dev --all-extras
