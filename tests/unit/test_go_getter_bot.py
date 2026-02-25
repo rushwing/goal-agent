@@ -204,7 +204,8 @@ async def test_cmd_checkin_success():
         mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         mock_crud_go_getter.get_by_chat_id = AsyncMock(return_value=go_getter)
-        mock_crud_task.get = AsyncMock(return_value=task)
+        mock_crud_task.get_with_ownership = AsyncMock(return_value=task)
+        mock_crud_task.get_eligible_for_date = AsyncMock(return_value=task)
         mock_crud_ci.get_by_task_and_go_getter = AsyncMock(return_value=None)
         mock_streak.update_streak_and_xp = AsyncMock(return_value=xp_result)
         mock_praise.generate_praise = AsyncMock(return_value="Great work!")
@@ -255,7 +256,8 @@ async def test_cmd_skip_success():
         mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         mock_crud_go_getter.get_by_chat_id = AsyncMock(return_value=go_getter)
-        mock_crud_task.get = AsyncMock(return_value=task)
+        mock_crud_task.get_with_ownership = AsyncMock(return_value=task)
+        mock_crud_task.get_eligible_for_date = AsyncMock(return_value=task)
         mock_crud_ci.get_by_task_and_go_getter = AsyncMock(return_value=None)
 
         await cmd_skip(update, ctx)
@@ -291,7 +293,8 @@ async def test_cmd_checkin_already_recorded():
         mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         mock_crud_go_getter.get_by_chat_id = AsyncMock(return_value=go_getter)
-        mock_crud_task.get = AsyncMock(return_value=task)
+        mock_crud_task.get_with_ownership = AsyncMock(return_value=task)
+        mock_crud_task.get_eligible_for_date = AsyncMock(return_value=task)
         mock_crud_ci.get_by_task_and_go_getter = AsyncMock(return_value=existing_ci)
 
         await cmd_checkin(update, ctx)

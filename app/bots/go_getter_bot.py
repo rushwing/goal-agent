@@ -195,9 +195,17 @@ async def _do_checkin(
     mood_score: int = 3,
     via_callback: bool = False,
 ) -> None:
-    task = await crud_task.get(db, task_id)
+    task = await crud_task.get_with_ownership(db, task_id, go_getter.id)
     if not task:
-        msg = f"Task #{task_id} not found."
+        msg = f"Task #{task_id} not found or not yours."
+        if via_callback:
+            await update.callback_query.edit_message_text(msg)  # type: ignore[union-attr]
+        else:
+            await update.message.reply_text(msg)  # type: ignore[union-attr]
+        return
+    eligible = await crud_task.get_eligible_for_date(db, task_id, go_getter.id, date.today())
+    if not eligible:
+        msg = f"Task #{task_id} is not scheduled for today."
         if via_callback:
             await update.callback_query.edit_message_text(msg)  # type: ignore[union-attr]
         else:
@@ -272,9 +280,17 @@ async def _do_skip(
     reason: Optional[str],
     via_callback: bool = False,
 ) -> None:
-    task = await crud_task.get(db, task_id)
+    task = await crud_task.get_with_ownership(db, task_id, go_getter.id)
     if not task:
-        msg = f"Task #{task_id} not found."
+        msg = f"Task #{task_id} not found or not yours."
+        if via_callback:
+            await update.callback_query.edit_message_text(msg)  # type: ignore[union-attr]
+        else:
+            await update.message.reply_text(msg)  # type: ignore[union-attr]
+        return
+    eligible = await crud_task.get_eligible_for_date(db, task_id, go_getter.id, date.today())
+    if not eligible:
+        msg = f"Task #{task_id} is not scheduled for today."
         if via_callback:
             await update.callback_query.edit_message_text(msg)  # type: ignore[union-attr]
         else:

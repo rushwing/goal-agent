@@ -89,31 +89,36 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
 
     op.alter_column(
-        "go_getters", "parent_id",
+        "go_getters",
+        "parent_id",
         new_column_name="best_pal_id",
         existing_type=sa.Integer(),
         nullable=True,
     )
     op.alter_column(
-        "targets", "pupil_id",
+        "targets",
+        "pupil_id",
         new_column_name="go_getter_id",
         existing_type=sa.Integer(),
         nullable=False,
     )
     op.alter_column(
-        "check_ins", "pupil_id",
+        "check_ins",
+        "pupil_id",
         new_column_name="go_getter_id",
         existing_type=sa.Integer(),
         nullable=False,
     )
     op.alter_column(
-        "reports", "pupil_id",
+        "reports",
+        "pupil_id",
         new_column_name="go_getter_id",
         existing_type=sa.Integer(),
         nullable=False,
     )
     op.alter_column(
-        "achievements", "pupil_id",
+        "achievements",
+        "pupil_id",
         new_column_name="go_getter_id",
         existing_type=sa.Integer(),
         nullable=False,
@@ -167,28 +172,38 @@ def upgrade() -> None:
 
     op.create_foreign_key(
         "fk_targets_go_getter_id",
-        "targets", "go_getters",
-        ["go_getter_id"], ["id"],
+        "targets",
+        "go_getters",
+        ["go_getter_id"],
+        ["id"],
     )
     op.create_foreign_key(
         "fk_check_ins_go_getter_id",
-        "check_ins", "go_getters",
-        ["go_getter_id"], ["id"],
+        "check_ins",
+        "go_getters",
+        ["go_getter_id"],
+        ["id"],
     )
     op.create_foreign_key(
         "fk_reports_go_getter_id",
-        "reports", "go_getters",
-        ["go_getter_id"], ["id"],
+        "reports",
+        "go_getters",
+        ["go_getter_id"],
+        ["id"],
     )
     op.create_foreign_key(
         "fk_achievements_go_getter_id",
-        "achievements", "go_getters",
-        ["go_getter_id"], ["id"],
+        "achievements",
+        "go_getters",
+        ["go_getter_id"],
+        ["id"],
     )
     op.create_foreign_key(
         "fk_go_getters_best_pal_id",
-        "go_getters", "best_pals",
-        ["best_pal_id"], ["id"],
+        "go_getters",
+        "best_pals",
+        ["best_pal_id"],
+        ["id"],
     )
     op.create_index("ix_go_getters_best_pal_id", "go_getters", ["best_pal_id"])
 
@@ -231,31 +246,36 @@ def downgrade() -> None:
 
     # Rename columns back
     op.alter_column(
-        "achievements", "go_getter_id",
+        "achievements",
+        "go_getter_id",
         new_column_name="pupil_id",
         existing_type=sa.Integer(),
         nullable=False,
     )
     op.alter_column(
-        "reports", "go_getter_id",
+        "reports",
+        "go_getter_id",
         new_column_name="pupil_id",
         existing_type=sa.Integer(),
         nullable=False,
     )
     op.alter_column(
-        "check_ins", "go_getter_id",
+        "check_ins",
+        "go_getter_id",
         new_column_name="pupil_id",
         existing_type=sa.Integer(),
         nullable=False,
     )
     op.alter_column(
-        "targets", "go_getter_id",
+        "targets",
+        "go_getter_id",
         new_column_name="pupil_id",
         existing_type=sa.Integer(),
         nullable=False,
     )
     op.alter_column(
-        "go_getters", "best_pal_id",
+        "go_getters",
+        "best_pal_id",
         new_column_name="parent_id",
         existing_type=sa.Integer(),
         nullable=True,
@@ -272,12 +292,8 @@ def downgrade() -> None:
     op.create_unique_constraint(
         "uq_achievement_pupil_badge", "achievements", ["pupil_id", "badge_key"]
     )
-    op.create_unique_constraint(
-        "uq_checkin_task_pupil", "check_ins", ["task_id", "pupil_id"]
-    )
+    op.create_unique_constraint("uq_checkin_task_pupil", "check_ins", ["task_id", "pupil_id"])
 
     # Restore FKs
-    op.create_foreign_key(
-        "fk_pupils_parent_id", "pupils", "parents", ["parent_id"], ["id"]
-    )
+    op.create_foreign_key("fk_pupils_parent_id", "pupils", "parents", ["parent_id"], ["id"])
     op.create_index("ix_pupils_parent_id", "pupils", ["parent_id"])

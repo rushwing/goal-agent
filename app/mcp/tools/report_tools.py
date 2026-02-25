@@ -4,7 +4,7 @@ from datetime import date
 from typing import Optional
 
 from app.database import AsyncSessionLocal
-from app.mcp.auth import Role, require_role, resolve_role
+from app.mcp.auth import Role, require_role, resolve_role, verify_best_pal_owns_go_getter
 from app.mcp.server import mcp
 from app.crud import crud_go_getter, crud_report
 from app.models.report import ReportType
@@ -24,6 +24,9 @@ async def _resolve_go_getter(db, caller_id: int, go_getter_id: Optional[int]):
         if go_getter_id is None:
             raise ValueError("go_getter_id is required for best_pal/admin role")
         go_getter = await crud_go_getter.get(db, go_getter_id)
+        if not go_getter:
+            raise ValueError("Go getter not found")
+        await verify_best_pal_owns_go_getter(db, caller_id, go_getter.id)
     else:
         # Go getter uses their own record
         go_getter = await crud_go_getter.get_by_chat_id(db, caller_id)

@@ -13,9 +13,13 @@ class CRUDTarget(CRUDBase[Target, TargetCreate, TargetUpdate]):
         result = await db.execute(select(Target).where(Target.go_getter_id == go_getter_id))
         return result.scalars().all()
 
-    async def get_active_by_go_getter(self, db: AsyncSession, go_getter_id: int) -> Sequence[Target]:
+    async def get_active_by_go_getter(
+        self, db: AsyncSession, go_getter_id: int
+    ) -> Sequence[Target]:
         result = await db.execute(
-            select(Target).where(Target.go_getter_id == go_getter_id, Target.status == TargetStatus.active)
+            select(Target).where(
+                Target.go_getter_id == go_getter_id, Target.status == TargetStatus.active
+            )
         )
         return result.scalars().all()
 

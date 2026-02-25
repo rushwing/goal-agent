@@ -36,5 +36,7 @@ class GoGetter(Base, TimestampMixin):
     best_pal: Mapped[Optional["BestPal"]] = relationship("BestPal", back_populates="go_getters")
     targets: Mapped[list["Target"]] = relationship("Target", back_populates="go_getter")
     check_ins: Mapped[list["CheckIn"]] = relationship("CheckIn", back_populates="go_getter")
-    achievements: Mapped[list["Achievement"]] = relationship("Achievement", back_populates="go_getter")
+    achievements: Mapped[list["Achievement"]] = relationship(
+        "Achievement", back_populates="go_getter"
+    )
     reports: Mapped[list["Report"]] = relationship("Report", back_populates="go_getter")

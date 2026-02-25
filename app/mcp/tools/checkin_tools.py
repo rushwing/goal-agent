@@ -17,6 +17,17 @@ def _require_chat_id(chat_id: Optional[int]) -> int:
     return chat_id
 
 
+async def _validate_task(db, task_id: int, go_getter_id: int):
+    """Validate task ownership and date eligibility. Raises ValueError on failure."""
+    task = await crud_task.get_with_ownership(db, task_id, go_getter_id)
+    if not task:
+        raise ValueError(f"Task {task_id} not found or not owned by this go getter")
+    eligible = await crud_task.get_eligible_for_date(db, task_id, go_getter_id, date.today())
+    if not eligible:
+        raise ValueError(f"Task {task_id} is not scheduled for today")
+    return task
+
+
 @mcp.tool()
 async def list_today_tasks(
     x_telegram_chat_id: Optional[int] = None,
@@ -96,9 +107,7 @@ async def checkin_task(
         await require_role(db, caller_id, [Role.go_getter])
         go_getter = await crud_go_getter.get_by_chat_id(db, caller_id)
 
-        task = await crud_task.get(db, task_id)
-        if not task:
-            raise ValueError(f"Task {task_id} not found")
+        task = await _validate_task(db, task_id, go_getter.id)
 
         # Idempotent check
         existing = await crud_check_in.get_by_task_and_go_getter(db, task_id, go_getter.id)
@@ -178,9 +187,7 @@ async def skip_task(
     async with AsyncSessionLocal() as db:
         await require_role(db, caller_id, [Role.go_getter])
         go_getter = await crud_go_getter.get_by_chat_id(db, caller_id)
-        task = await crud_task.get(db, task_id)
-        if not task:
-            raise ValueError(f"Task {task_id} not found")
+        await _validate_task(db, task_id, go_getter.id)
 
         existing = await crud_check_in.get_by_task_and_go_getter(db, task_id, go_getter.id)
         if existing:

@@ -48,3 +48,23 @@ async def require_role(
             f"your role: {role.value}"
         )
     return role
+
+
+async def verify_best_pal_owns_go_getter(
+    db: AsyncSession, caller_id: int, go_getter_id: int
+) -> None:
+    """Raise PermissionError/ValueError if the caller doesn't own the go_getter.
+
+    Admins always pass. Best pals must be the assigned best_pal for the go_getter.
+    """
+    role = await resolve_role(db, caller_id)
+    if role == Role.admin:
+        return
+
+    go_getter = await crud_go_getter.get(db, go_getter_id)
+    if not go_getter:
+        raise ValueError("Go getter not found")
+
+    best_pal = await crud_best_pal.get_by_chat_id(db, caller_id)
+    if best_pal is None or go_getter.best_pal_id != best_pal.id:
+        raise PermissionError("Not authorized to access this go getter")

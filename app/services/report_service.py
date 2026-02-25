@@ -84,9 +84,7 @@ async def _generate_content(
         return _fallback_report(go_getter_name, report_type, period_label, stats)
 
 
-def _fallback_report(
-    go_getter_name: str, report_type: str, period_label: str, stats: dict
-) -> str:
+def _fallback_report(go_getter_name: str, report_type: str, period_label: str, stats: dict) -> str:
     completion_pct = round(stats["completed"] / stats["total"] * 100) if stats["total"] > 0 else 0
     return (
         f"# {report_type.capitalize()} Report – {go_getter_name}\n\n"
