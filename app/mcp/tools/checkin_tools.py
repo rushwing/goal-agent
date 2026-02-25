@@ -187,7 +187,7 @@ async def skip_task(
     async with AsyncSessionLocal() as db:
         await require_role(db, caller_id, [Role.go_getter])
         go_getter = await crud_go_getter.get_by_chat_id(db, caller_id)
-        task = await _validate_task(db, task_id, go_getter.id)
+        await _validate_task(db, task_id, go_getter.id)
 
         existing = await crud_check_in.get_by_task_and_go_getter(db, task_id, go_getter.id)
         if existing:
