@@ -194,8 +194,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-
     # Drop recreated FKs
     op.drop_index("ix_go_getters_best_pal_id", table_name="go_getters")
     op.drop_constraint("fk_go_getters_best_pal_id", "go_getters", type_="foreignkey")
