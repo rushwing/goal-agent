@@ -1,6 +1,6 @@
-# Vacation Study Planner
+# Goal Agent
 
-AI-powered vacation study planner for families. Generates personalised study plans using **Kimi 2.5** (Moonshot AI), tracks daily task completion with Duolingo-style streaks and XP, auto-commits progress reports to GitHub, and delivers notifications via Telegram. Designed to run on a **Raspberry Pi 5** as a lightweight home server.
+AI-powered goal and habit tracking agent. Generates personalized study plans using **Kimi 2.5** (Moonshot AI), tracks daily task completion with Duolingo-style streaks and XP, auto-commits progress reports to GitHub, and delivers notifications via Telegram. Designed to run on a **Raspberry Pi 5** as a lightweight home server.
 
 ---
 
@@ -56,7 +56,7 @@ AI-powered vacation study planner for families. Generates personalised study pla
 ## Project Layout
 
 ```
-vocation_study_planner/
+goal-agent/
 ├── app/
 │   ├── main.py                  # FastAPI app + FastMCP mount + lifespan
 │   ├── config.py                # Pydantic BaseSettings (.env)
@@ -90,8 +90,8 @@ vocation_study_planner/
 ### 1 – Bootstrap
 
 ```bash
-git clone https://github.com/your-org/vocation_study_planner.git
-cd vocation_study_planner
+git clone https://github.com/your-org/goal-agent.git
+cd goal-agent
 ./scripts/setup.sh --dev        # installs uv, creates .venv, copies .env
 ```
 

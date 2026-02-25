@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "vocation-study-planner"
+name = "goal-agent"
 version = "0.1.0"
-description = "AI-powered vacation study planner for families"
+description = "AI-powered goal and habit tracking agent"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

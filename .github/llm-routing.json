@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "repository": "rushwing/vocation_study_planner",
+  "repository": "rushwing/goal-agent",
   "workers": [
     "claude",
     "gemini",

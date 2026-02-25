@@ -8,7 +8,7 @@
 #
 # Or call it remotely:
 #
-#   ssh pi@raspberry-pi "cd ~/vocation_study_planner && git pull && ./scripts/deploy.sh"
+#   ssh pi@raspberry-pi "cd ~/goal-agent && git pull && ./scripts/deploy.sh"
 #
 # What it does:
 #   1. Ensure uv is installed
@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$ROOT"
 
-SERVICE_NAME="vocation-planner"
+SERVICE_NAME="goal-agent"
 SYSTEMD_UNIT_SRC="$ROOT/systemd/${SERVICE_NAME}.service"
 SYSTEMD_UNIT_DST="/etc/systemd/system/${SERVICE_NAME}.service"
 
@@ -59,7 +59,7 @@ if [[ -f "$SYSTEMD_UNIT_SRC" ]]; then
   if [[ "$(id -u)" -eq 0 ]]; then
     step "Installing systemd service…"
     # Update WorkingDirectory and ExecStart to point to this directory
-    sed "s|/home/pi/vocation_study_planner|$ROOT|g" \
+    sed "s|/home/pi/goal-agent|$ROOT|g" \
         "$SYSTEMD_UNIT_SRC" > "$SYSTEMD_UNIT_DST"
     systemctl daemon-reload
     systemctl enable "$SERVICE_NAME"
