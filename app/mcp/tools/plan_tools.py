@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.database import AsyncSessionLocal
-from app.mcp.auth import Role, require_role
+from app.mcp.auth import Role, require_role, verify_best_pal_owns_go_getter
 from app.mcp.server import mcp
 from app.crud import crud_go_getter, crud_target, crud_plan
 from app.schemas.target import TargetCreate, TargetUpdate
@@ -43,6 +43,7 @@ async def create_target(
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
         await require_role(db, caller_id, [Role.admin, Role.best_pal])
+        await verify_best_pal_owns_go_getter(db, caller_id, go_getter_id)
         schema = TargetCreate(
             go_getter_id=go_getter_id,
             title=title,
@@ -79,6 +80,7 @@ async def update_target(
         target = await crud_target.get(db, target_id)
         if not target:
             raise ValueError(f"Target {target_id} not found")
+        await verify_best_pal_owns_go_getter(db, caller_id, target.go_getter_id)
         schema = TargetUpdate(
             title=title,
             subject=subject,
@@ -116,6 +118,7 @@ async def list_targets(
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
         await require_role(db, caller_id, [Role.admin, Role.best_pal])
+        await verify_best_pal_owns_go_getter(db, caller_id, go_getter_id)
         targets = await crud_target.get_by_go_getter(db, go_getter_id)
         return [
             {"id": t.id, "title": t.title, "subject": t.subject, "status": t.status.value}
@@ -151,6 +154,8 @@ async def generate_plan(
         target = await crud_target.get(db, target_id)
         if not target:
             raise ValueError(f"Target {target_id} not found")
+
+        await verify_best_pal_owns_go_getter(db, caller_id, target.go_getter_id)
 
         go_getter = await crud_go_getter.get(db, target.go_getter_id)
         if not go_getter:
@@ -247,6 +252,8 @@ async def update_plan(
         plan = await crud_plan.get(db, plan_id)
         if not plan:
             raise ValueError(f"Plan {plan_id} not found")
+        target = await crud_target.get(db, plan.target_id)
+        await verify_best_pal_owns_go_getter(db, caller_id, target.go_getter_id)
         from app.models.plan import PlanStatus
 
         schema = PlanUpdate(
@@ -267,9 +274,12 @@ async def delete_plan(
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
         await require_role(db, caller_id, [Role.admin])
-        plan = await crud_plan.remove(db, id=plan_id)
+        plan = await crud_plan.get(db, plan_id)
         if not plan:
             raise ValueError(f"Plan {plan_id} not found")
+        target = await crud_target.get(db, plan.target_id)
+        await verify_best_pal_owns_go_getter(db, caller_id, target.go_getter_id)
+        await crud_plan.remove(db, id=plan_id)
         await db.commit()
         return {"success": True, "plan_id": plan_id}
 
@@ -312,6 +322,8 @@ async def get_plan_detail(
         plan = await crud_plan.get_with_milestones(db, plan_id)
         if not plan:
             raise ValueError(f"Plan {plan_id} not found")
+        target = await crud_target.get(db, plan.target_id)
+        await verify_best_pal_owns_go_getter(db, caller_id, target.go_getter_id)
         return {
             "id": plan.id,
             "title": plan.title,
