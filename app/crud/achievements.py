@@ -10,7 +10,9 @@ from app.schemas.achievement import AchievementResponse
 
 class CRUDAchievement(CRUDBase[Achievement, AchievementResponse, AchievementResponse]):
     async def get_by_go_getter(self, db: AsyncSession, go_getter_id: int) -> Sequence[Achievement]:
-        result = await db.execute(select(Achievement).where(Achievement.go_getter_id == go_getter_id))
+        result = await db.execute(
+            select(Achievement).where(Achievement.go_getter_id == go_getter_id)
+        )
         return result.scalars().all()
 
     async def get_by_badge(

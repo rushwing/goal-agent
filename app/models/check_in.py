@@ -26,7 +26,9 @@ class CheckInStatus(str, enum.Enum):
 
 class CheckIn(Base, TimestampMixin):
     __tablename__ = "check_ins"
-    __table_args__ = (UniqueConstraint("task_id", "go_getter_id", name="uq_checkin_task_go_getter"),)
+    __table_args__ = (
+        UniqueConstraint("task_id", "go_getter_id", name="uq_checkin_task_go_getter"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     task_id: Mapped[int] = mapped_column(Integer, ForeignKey("tasks.id"), nullable=False)
