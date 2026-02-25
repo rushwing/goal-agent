@@ -28,7 +28,7 @@ export function registerCheckinTools(client: AxiosInstance) {
       return data;
     },
 
-    get_pupil_progress: async () => {
+    get_go_getter_progress: async () => {
       // Placeholder: could be a dedicated endpoint
       const { data } = await client.get("/checkins/today");
       return { tasks_today: data };

@@ -1,5 +1,5 @@
-from app.crud.pupils import crud_pupil
-from app.crud.parents import crud_parent
+from app.crud.go_getters import crud_go_getter
+from app.crud.best_pals import crud_best_pal
 from app.crud.targets import crud_target
 from app.crud.plans import crud_plan
 from app.crud.tasks import crud_task
@@ -8,8 +8,8 @@ from app.crud.reports import crud_report
 from app.crud.achievements import crud_achievement
 
 __all__ = [
-    "crud_pupil",
-    "crud_parent",
+    "crud_go_getter",
+    "crud_best_pal",
     "crud_target",
     "crud_plan",
     "crud_task",

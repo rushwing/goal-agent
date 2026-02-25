@@ -1,4 +1,4 @@
-"""Tests for issue #4: single active plan invariant per pupil."""
+"""Tests for issue #4: single active plan invariant per go getter."""
 
 from datetime import date, timedelta
 from unittest.mock import AsyncMock, patch
@@ -6,31 +6,31 @@ from unittest.mock import AsyncMock, patch
 import pytest
 import pytest_asyncio
 
-from app.models.parent import Parent
-from app.models.pupil import Pupil
+from app.models.best_pal import BestPal
+from app.models.go_getter import GoGetter
 from app.models.target import Target, VacationType, TargetStatus
 from app.models.plan import Plan, PlanStatus
 from app.crud.plans import crud_plan
 
 
 @pytest_asyncio.fixture
-async def pupil_with_target(db):
-    parent = Parent(name="P", telegram_chat_id=6001, is_admin=False)
-    db.add(parent)
+async def go_getter_with_target(db):
+    best_pal = BestPal(name="P", telegram_chat_id=6001, is_admin=False)
+    db.add(best_pal)
     await db.flush()
 
-    pupil = Pupil(
-        parent_id=parent.id,
+    go_getter = GoGetter(
+        best_pal_id=best_pal.id,
         name="Charlie",
         display_name="Charlie",
         grade="4",
         telegram_chat_id=6002,
     )
-    db.add(pupil)
+    db.add(go_getter)
     await db.flush()
 
     target = Target(
-        pupil_id=pupil.id,
+        go_getter_id=go_getter.id,
         title="English",
         subject="English",
         description="",
@@ -40,13 +40,13 @@ async def pupil_with_target(db):
     )
     db.add(target)
     await db.flush()
-    return pupil, target
+    return go_getter, target
 
 
 @pytest.mark.asyncio
-async def test_generate_plan_deactivates_prior_active_plan(db, pupil_with_target):
+async def test_generate_plan_deactivates_prior_active_plan(db, go_getter_with_target):
     """Generating a second plan must mark the first plan as completed."""
-    pupil, target = pupil_with_target
+    go_getter, target = go_getter_with_target
     today = date.today()
 
     # Create an existing active plan manually
@@ -84,8 +84,8 @@ async def test_generate_plan_deactivates_prior_active_plan(db, pupil_with_target
         new_plan = await generate_plan(
             db=db,
             target=target,
-            pupil_name=pupil.name,
-            grade=pupil.grade,
+            pupil_name=go_getter.name,
+            grade=go_getter.grade,
             start_date=today + timedelta(days=7),
             end_date=today + timedelta(days=13),
             daily_study_minutes=60,
@@ -100,9 +100,9 @@ async def test_generate_plan_deactivates_prior_active_plan(db, pupil_with_target
 
 
 @pytest.mark.asyncio
-async def test_only_one_active_plan_after_generate(db, pupil_with_target):
-    """After generation, at most one plan should be active for the pupil."""
-    pupil, target = pupil_with_target
+async def test_only_one_active_plan_after_generate(db, go_getter_with_target):
+    """After generation, at most one plan should be active for the go getter."""
+    go_getter, target = go_getter_with_target
     today = date.today()
 
     fake_plan_data = {"title": "P", "overview": "o", "weeks": []}
@@ -116,8 +116,8 @@ async def test_only_one_active_plan_after_generate(db, pupil_with_target):
         await generate_plan(
             db=db,
             target=target,
-            pupil_name=pupil.name,
-            grade=pupil.grade,
+            pupil_name=go_getter.name,
+            grade=go_getter.grade,
             start_date=today,
             end_date=today + timedelta(days=6),
             daily_study_minutes=60,
@@ -126,15 +126,15 @@ async def test_only_one_active_plan_after_generate(db, pupil_with_target):
         await generate_plan(
             db=db,
             target=target,
-            pupil_name=pupil.name,
-            grade=pupil.grade,
+            pupil_name=go_getter.name,
+            grade=go_getter.grade,
             start_date=today + timedelta(days=7),
             end_date=today + timedelta(days=13),
             daily_study_minutes=60,
             preferred_days=[0],
         )
 
-    active_plan = await crud_plan.get_active_for_pupil(db, pupil.id)
+    active_plan = await crud_plan.get_active_for_go_getter(db, go_getter.id)
     assert active_plan is not None
 
     from sqlalchemy import select
@@ -143,7 +143,7 @@ async def test_only_one_active_plan_after_generate(db, pupil_with_target):
     result = await db.execute(
         select(Plan)
         .join(T, Plan.target_id == T.id)
-        .where(T.pupil_id == pupil.id, Plan.status == PlanStatus.active)
+        .where(T.go_getter_id == go_getter.id, Plan.status == PlanStatus.active)
     )
     active_plans = result.scalars().all()
     assert len(active_plans) == 1, f"Expected 1 active plan, got {len(active_plans)}"

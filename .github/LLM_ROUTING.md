@@ -224,7 +224,7 @@ Suggested execution order:
 
 ```text
 [bot-blocked]
-reason=Depends on issue #2 parent-pupil ownership model
+reason=Depends on issue #2 best_pal/go_getter ownership model
 next_check=after blocker merged
 ```
 

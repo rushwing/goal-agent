@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.pupil import Pupil
+    from app.models.go_getter import GoGetter
 
 # MediumText may not be available in all backends; use Text as fallback
 try:
@@ -30,11 +30,11 @@ class ReportType(str, enum.Enum):
 class Report(Base, TimestampMixin):
     __tablename__ = "reports"
     __table_args__ = (
-        UniqueConstraint("pupil_id", "report_type", "period_start", name="uq_report_identity"),
+        UniqueConstraint("go_getter_id", "report_type", "period_start", name="uq_report_identity"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    pupil_id: Mapped[int] = mapped_column(Integer, ForeignKey("pupils.id"), nullable=False)
+    go_getter_id: Mapped[int] = mapped_column(Integer, ForeignKey("go_getters.id"), nullable=False)
     report_type: Mapped[ReportType] = mapped_column(Enum(ReportType), nullable=False)
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
@@ -48,4 +48,4 @@ class Report(Base, TimestampMixin):
     sent_to_telegram: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships
-    pupil: Mapped["Pupil"] = relationship("Pupil", back_populates="reports")
+    go_getter: Mapped["GoGetter"] = relationship("GoGetter", back_populates="reports")

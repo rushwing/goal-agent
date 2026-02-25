@@ -7,9 +7,9 @@ AI-powered goal and habit tracking agent. Generates personalized study plans usi
 ## Architecture
 
 ```
-[OpenClaw Parent Bot] ─┐                    ┌─ [Kimi 2.5 API]
-[OpenClaw Pupil Bot]  ─┤                    │
-                       ▼                    ▼
+[OpenClaw Best Pal Bot] ─┐                   ┌─ [Kimi 2.5 API]
+[OpenClaw Go Getter Bot] ─┤                  │
+                          ▼                  ▼
               [FastAPI REST :8000] ── [FastMCP /mcp]
                        │
               [Services Layer]
@@ -26,7 +26,7 @@ AI-powered goal and habit tracking agent. Generates personalized study plans usi
 
 - **FastMCP** is mounted as an ASGI sub-app inside FastAPI — one process, one event loop.
 - **APScheduler** runs in-process; a single uvicorn worker is required (`--workers 1`).
-- **Role auth** is header-driven: `X-Telegram-Chat-Id` → `admin / parent / pupil`.
+- **Role auth** is header-driven: `X-Telegram-Chat-Id` → `admin / best_pal / go_getter`.
 - **OpenClaw** (TypeScript plugin) calls the FastAPI REST layer directly — it does not speak MCP natively.
 
 ---
@@ -85,7 +85,7 @@ goal-agent/
 
 - Python 3.12, [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - MariaDB / MySQL (or use Docker Compose)
-- Telegram bot tokens (parent + pupil), Kimi API key, GitHub PAT
+- Telegram bot tokens (best_pal + go_getter), Kimi API key, GitHub PAT
 
 ### 1 – Bootstrap
 
@@ -173,8 +173,8 @@ docker compose logs -f api      # follow logs
 | `KIMI_BASE_URL` | `https://api.moonshot.cn/v1` |
 | `KIMI_MODEL_SHORT` | `moonshot-v1-8k` (praise / short tasks) |
 | `KIMI_MODEL_LONG` | `moonshot-v1-32k` (plan generation) |
-| `TELEGRAM_PARENT_BOT_TOKEN` | Bot token for parent DMs + group |
-| `TELEGRAM_PUPIL_BOT_TOKEN` | Bot token for pupil DMs |
+| `TELEGRAM_BEST_PAL_BOT_TOKEN` | Bot token for best pal DMs + group |
+| `TELEGRAM_GO_GETTER_BOT_TOKEN` | Bot token for go getter DMs |
 | `TELEGRAM_GROUP_CHAT_ID` | Family Telegram group chat ID |
 | `GITHUB_PAT` | Personal access token for data repo |
 | `GITHUB_DATA_REPO` | `username/study-data-private` |
@@ -189,17 +189,17 @@ Copy `.env.example` → `.env` to get started.
 All tools require the `X-Telegram-Chat-Id` header for role resolution.
 
 ### Admin tools (`admin` role)
-`add_pupil` · `update_pupil` · `remove_pupil` · `list_pupils`
-`add_parent` · `update_parent` · `remove_parent` · `list_parents`
+`add_go_getter` · `update_go_getter` · `remove_go_getter` · `list_go_getters`
+`add_best_pal` · `update_best_pal` · `remove_best_pal` · `list_best_pals`
 
-### Plan tools (`parent / admin` role)
+### Plan tools (`best_pal / admin` role)
 `create_target` · `update_target` · `delete_target` · `list_targets`
 `generate_plan` · `update_plan` · `delete_plan` · `list_plans` · `get_plan_detail`
 
-### Check-in tools (`pupil` role)
-`list_today_tasks` · `list_week_tasks` · `checkin_task` · `skip_task` · `get_pupil_progress`
+### Check-in tools (`go_getter` role)
+`list_today_tasks` · `list_week_tasks` · `checkin_task` · `skip_task` · `get_go_getter_progress`
 
-### Report tools (`parent / admin`; pupil for own)
+### Report tools (`best_pal / admin`; go_getter for own)
 `generate_daily_report` · `generate_weekly_report` · `generate_monthly_report` · `list_reports`
 
 ---
@@ -233,7 +233,7 @@ mood_bonus:         1 → 0.8 · 2 → 0.9 · 3 → 1.0 · 4 → 1.1 · 5 → 1.
 
 | Time | Job |
 |------|-----|
-| 07:30 daily | Send today's task list DM to each active pupil |
+| 07:30 daily | Send today's task list DM to each active go getter |
 | 21:00 daily | Evening reminder for unchecked tasks + generate daily report |
 | Sunday 20:00 | Generate weekly report + post summary to Telegram group |
 | 1st of month 08:00 | Generate monthly report + post summary to Telegram group |
@@ -256,7 +256,7 @@ Configure via environment variable:
 PLUGIN_CONFIG='{"apiBaseUrl":"http://raspberry-pi-ip:8000/api/v1","telegramChatId":"123456789"}'
 ```
 
-Two configs are typical — one with a parent's chat ID, one with a pupil's — giving each the right role-gated tool set.
+Two configs are typical — one with a best pal's chat ID, one with a go getter's — giving each the right role-gated tool set.
 
 ---
 

@@ -5,7 +5,7 @@ from typing import NamedTuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.pupil import Pupil
+from app.models.go_getter import GoGetter
 from app.models.achievement import Achievement
 
 
@@ -47,45 +47,45 @@ def calculate_xp(base_xp: int, streak: int, mood_score: int) -> int:
 
 async def update_streak_and_xp(
     db: AsyncSession,
-    pupil: Pupil,
+    go_getter: GoGetter,
     base_xp: int,
     mood_score: int,
     check_in_date: date,
 ) -> XPResult:
     """
-    Update pupil streak and XP. Returns earned XP and any new badges.
+    Update go getter streak and XP. Returns earned XP and any new badges.
     """
     today = check_in_date
-    last = pupil.streak_last_date
+    last = go_getter.streak_last_date
 
     if last is None:
         new_streak = 1
     elif last == today:
         # Already checked in today; don't increment streak
-        new_streak = pupil.streak_current
+        new_streak = go_getter.streak_current
     elif last == today - timedelta(days=1):
-        new_streak = pupil.streak_current + 1
+        new_streak = go_getter.streak_current + 1
     else:
         # Streak broken
         new_streak = 1
 
     xp_earned = calculate_xp(base_xp, new_streak, mood_score)
 
-    pupil.streak_current = new_streak
-    if new_streak > pupil.streak_longest:
-        pupil.streak_longest = new_streak
-    pupil.streak_last_date = today
-    pupil.xp_total += xp_earned
-    db.add(pupil)
+    go_getter.streak_current = new_streak
+    if new_streak > go_getter.streak_longest:
+        go_getter.streak_longest = new_streak
+    go_getter.streak_last_date = today
+    go_getter.xp_total += xp_earned
+    db.add(go_getter)
 
-    badges_earned = await _check_achievements(db, pupil, new_streak, xp_earned)
+    badges_earned = await _check_achievements(db, go_getter, new_streak, xp_earned)
 
     return XPResult(xp_earned=xp_earned, new_streak=new_streak, badges_earned=badges_earned)
 
 
 async def _check_achievements(
     db: AsyncSession,
-    pupil: Pupil,
+    go_getter: GoGetter,
     new_streak: int,
     xp_just_earned: int,
 ) -> list[str]:
@@ -97,7 +97,7 @@ async def _check_achievements(
     candidates: list[str] = []
 
     # First check-in
-    if pupil.xp_total == xp_just_earned:  # first ever XP
+    if go_getter.xp_total == xp_just_earned:  # first ever XP
         candidates.append("first_checkin")
 
     # Streak milestones
@@ -107,20 +107,20 @@ async def _check_achievements(
 
     # XP milestones
     for threshold, key in [(50, "xp_50"), (100, "xp_100"), (500, "xp_500")]:
-        if pupil.xp_total >= threshold:
+        if go_getter.xp_total >= threshold:
             candidates.append(key)
 
     # Weekend warrior
-    today = pupil.streak_last_date
+    today = go_getter.streak_last_date
     if today and today.weekday() in (5, 6):  # Sat or Sun
         candidates.append("weekend_warrior")
 
     total_bonus = 0
     for badge_key in candidates:
-        if not await crud_achievement.has_badge(db, pupil.id, badge_key):
+        if not await crud_achievement.has_badge(db, go_getter.id, badge_key):
             name, icon, bonus = BADGE_CATALOGUE[badge_key]
             achievement = Achievement(
-                pupil_id=pupil.id,
+                go_getter_id=go_getter.id,
                 badge_key=badge_key,
                 badge_name=name,
                 badge_icon=icon,
@@ -131,7 +131,7 @@ async def _check_achievements(
             earned.append(badge_key)
 
     if total_bonus:
-        pupil.xp_total += total_bonus
-        db.add(pupil)
+        go_getter.xp_total += total_bonus
+        db.add(go_getter)
 
     return earned

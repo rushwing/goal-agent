@@ -21,24 +21,24 @@ class CRUDPlan(CRUDBase[Plan, PlanCreate, PlanUpdate]):
         )
         return result.scalar_one_or_none()
 
-    async def get_by_pupil(
-        self, db: AsyncSession, pupil_id: int, target_id: Optional[int] = None
+    async def get_by_go_getter(
+        self, db: AsyncSession, go_getter_id: int, target_id: Optional[int] = None
     ) -> Sequence[Plan]:
         query = (
             select(Plan)
             .join(Target, Plan.target_id == Target.id)
-            .where(Target.pupil_id == pupil_id)
+            .where(Target.go_getter_id == go_getter_id)
         )
         if target_id:
             query = query.where(Plan.target_id == target_id)
         result = await db.execute(query)
         return result.scalars().all()
 
-    async def get_active_for_pupil(self, db: AsyncSession, pupil_id: int) -> Optional[Plan]:
+    async def get_active_for_go_getter(self, db: AsyncSession, go_getter_id: int) -> Optional[Plan]:
         result = await db.execute(
             select(Plan)
             .join(Target, Plan.target_id == Target.id)
-            .where(Target.pupil_id == pupil_id, Plan.status == PlanStatus.active)
+            .where(Target.go_getter_id == go_getter_id, Plan.status == PlanStatus.active)
             .limit(1)
         )
         return result.scalar_one_or_none()

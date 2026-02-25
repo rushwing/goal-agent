@@ -7,7 +7,7 @@ from app.models.report import ReportType
 class ReportResponse(BaseModel):
     model_config = {"from_attributes": True}
     id: int
-    pupil_id: int
+    go_getter_id: int
     report_type: ReportType
     period_start: date
     period_end: date
@@ -24,7 +24,7 @@ class ReportResponse(BaseModel):
 class ReportSummary(BaseModel):
     model_config = {"from_attributes": True}
     id: int
-    pupil_id: int
+    go_getter_id: int
     report_type: ReportType
     period_start: date
     period_end: date

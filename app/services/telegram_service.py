@@ -38,20 +38,20 @@ async def send_message(
         return False
 
 
-async def send_to_pupil(chat_id: int | str, text: str) -> bool:
-    """Send DM via the pupil bot."""
-    if not settings.TELEGRAM_PUPIL_BOT_TOKEN:
-        logger.warning("TELEGRAM_PUPIL_BOT_TOKEN not configured")
+async def send_to_go_getter(chat_id: int | str, text: str) -> bool:
+    """Send DM via the go getter bot."""
+    if not settings.TELEGRAM_GO_GETTER_BOT_TOKEN:
+        logger.warning("TELEGRAM_GO_GETTER_BOT_TOKEN not configured")
         return False
-    return await send_message(chat_id, text, bot_token=settings.TELEGRAM_PUPIL_BOT_TOKEN)
+    return await send_message(chat_id, text, bot_token=settings.TELEGRAM_GO_GETTER_BOT_TOKEN)
 
 
-async def send_to_parent(chat_id: int | str, text: str) -> bool:
-    """Send DM via the parent bot."""
-    if not settings.TELEGRAM_PARENT_BOT_TOKEN:
-        logger.warning("TELEGRAM_PARENT_BOT_TOKEN not configured")
+async def send_to_best_pal(chat_id: int | str, text: str) -> bool:
+    """Send DM via the best pal bot."""
+    if not settings.TELEGRAM_BEST_PAL_BOT_TOKEN:
+        logger.warning("TELEGRAM_BEST_PAL_BOT_TOKEN not configured")
         return False
-    return await send_message(chat_id, text, bot_token=settings.TELEGRAM_PARENT_BOT_TOKEN)
+    return await send_message(chat_id, text, bot_token=settings.TELEGRAM_BEST_PAL_BOT_TOKEN)
 
 
 async def send_to_group(text: str) -> bool:
@@ -62,5 +62,5 @@ async def send_to_group(text: str) -> bool:
     return await send_message(
         settings.TELEGRAM_GROUP_CHAT_ID,
         text,
-        bot_token=settings.TELEGRAM_PARENT_BOT_TOKEN,
+        bot_token=settings.TELEGRAM_BEST_PAL_BOT_TOKEN,
     )

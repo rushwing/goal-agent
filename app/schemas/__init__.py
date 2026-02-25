@@ -1,5 +1,5 @@
-from app.schemas.pupil import PupilCreate, PupilUpdate, PupilResponse
-from app.schemas.parent import ParentCreate, ParentUpdate, ParentResponse
+from app.schemas.go_getter import GoGetterCreate, GoGetterUpdate, GoGetterResponse
+from app.schemas.best_pal import BestPalCreate, BestPalUpdate, BestPalResponse
 from app.schemas.target import TargetCreate, TargetUpdate, TargetResponse
 from app.schemas.plan import PlanCreate, PlanUpdate, PlanResponse, GeneratePlanRequest
 from app.schemas.task import TaskResponse

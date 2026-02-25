@@ -19,7 +19,7 @@ class CheckInResponse(BaseModel):
     model_config = {"from_attributes": True}
     id: int
     task_id: int
-    pupil_id: int
+    go_getter_id: int
     status: CheckInStatus
     mood_score: Optional[int]
     duration_minutes: Optional[int]

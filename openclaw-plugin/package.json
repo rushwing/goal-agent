@@ -1,7 +1,7 @@
 {
-  "name": "openclaw-study-planner",
+  "name": "openclaw-goal-agent",
   "version": "0.1.0",
-  "description": "OpenClaw plugin for Vacation Study Planner",
+  "description": "OpenClaw plugin for Goal Agent",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

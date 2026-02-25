@@ -53,19 +53,19 @@ class HmacMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting Vacation Study Planner...")
+    logger.info("Starting Goal Agent...")
     setup_scheduler()
     scheduler.start()
     logger.info("APScheduler started with %d jobs", len(scheduler.get_jobs()))
 
     bot_task = None
-    if settings.TELEGRAM_PUPIL_BOT_TOKEN:
-        from app.bots.student_bot import start_student_bot
+    if settings.TELEGRAM_GO_GETTER_BOT_TOKEN:
+        from app.bots.go_getter_bot import start_go_getter_bot
 
-        bot_task = asyncio.create_task(start_student_bot())
-        logger.info("Telegram student bot task started")
+        bot_task = asyncio.create_task(start_go_getter_bot())
+        logger.info("Telegram go getter bot task started")
     else:
-        logger.info("TELEGRAM_PUPIL_BOT_TOKEN not set – student bot disabled")
+        logger.info("TELEGRAM_GO_GETTER_BOT_TOKEN not set – go getter bot disabled")
 
     yield
 
@@ -74,15 +74,15 @@ async def lifespan(app: FastAPI):
         bot_task.cancel()
         with suppress(asyncio.CancelledError):
             await bot_task
-        logger.info("Telegram student bot stopped")
+        logger.info("Telegram go getter bot stopped")
 
     scheduler.shutdown(wait=False)
     logger.info("APScheduler stopped")
 
 
 app = FastAPI(
-    title="Vacation Study Planner",
-    description="AI-powered vacation study planner for families",
+    title="Goal Agent",
+    description="AI-powered goal and habit tracking agent",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -112,4 +112,4 @@ app.mount("/mcp", mcp_app)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "vacation-study-planner"}
+    return {"status": "ok", "service": "goal-agent"}

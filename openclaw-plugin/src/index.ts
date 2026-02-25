@@ -1,5 +1,5 @@
 /**
- * OpenClaw plugin entrypoint for Vacation Study Planner.
+ * OpenClaw plugin entrypoint for Goal Agent.
  *
  * OpenClaw loads this as a CommonJS module and calls exported tool functions.
  * Each tool function receives its arguments and returns a result.

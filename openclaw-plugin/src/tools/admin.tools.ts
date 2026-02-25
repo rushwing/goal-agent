@@ -2,67 +2,67 @@ import { AxiosInstance } from "axios";
 
 export function registerAdminTools(client: AxiosInstance) {
   return {
-    add_pupil: async (args: {
+    add_go_getter: async (args: {
       name: string;
       display_name: string;
       grade: string;
       telegram_chat_id: number;
-      parent_id?: number;
+      best_pal_id?: number;
     }) => {
-      const { data } = await client.post("/admin/pupils", args);
+      const { data } = await client.post("/admin/go_getters", args);
       return data;
     },
 
-    update_pupil: async (args: {
-      pupil_id: number;
+    update_go_getter: async (args: {
+      go_getter_id: number;
       name?: string;
       display_name?: string;
       grade?: string;
       telegram_chat_id?: number;
       is_active?: boolean;
     }) => {
-      const { pupil_id, ...body } = args;
-      const { data } = await client.patch(`/admin/pupils/${pupil_id}`, body);
+      const { go_getter_id, ...body } = args;
+      const { data } = await client.patch(`/admin/go_getters/${go_getter_id}`, body);
       return data;
     },
 
-    remove_pupil: async (args: { pupil_id: number }) => {
-      const { data } = await client.delete(`/admin/pupils/${args.pupil_id}`);
+    remove_go_getter: async (args: { go_getter_id: number }) => {
+      const { data } = await client.delete(`/admin/go_getters/${args.go_getter_id}`);
       return data;
     },
 
-    list_pupils: async () => {
-      const { data } = await client.get("/admin/pupils");
+    list_go_getters: async () => {
+      const { data } = await client.get("/admin/go_getters");
       return data;
     },
 
-    add_parent: async (args: {
+    add_best_pal: async (args: {
       name: string;
       telegram_chat_id: number;
       is_admin?: boolean;
     }) => {
-      const { data } = await client.post("/admin/parents", args);
+      const { data } = await client.post("/admin/best_pals", args);
       return data;
     },
 
-    update_parent: async (args: {
-      parent_id: number;
+    update_best_pal: async (args: {
+      best_pal_id: number;
       name?: string;
       telegram_chat_id?: number;
       is_admin?: boolean;
     }) => {
-      const { parent_id, ...body } = args;
-      const { data } = await client.patch(`/admin/parents/${parent_id}`, body);
+      const { best_pal_id, ...body } = args;
+      const { data } = await client.patch(`/admin/best_pals/${best_pal_id}`, body);
       return data;
     },
 
-    remove_parent: async (args: { parent_id: number }) => {
-      const { data } = await client.delete(`/admin/parents/${args.parent_id}`);
+    remove_best_pal: async (args: { best_pal_id: number }) => {
+      const { data } = await client.delete(`/admin/best_pals/${args.best_pal_id}`);
       return data;
     },
 
-    list_parents: async () => {
-      const { data } = await client.get("/admin/parents");
+    list_best_pals: async () => {
+      const { data } = await client.get("/admin/best_pals");
       return data;
     },
   };

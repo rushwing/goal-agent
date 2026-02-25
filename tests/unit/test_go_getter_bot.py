@@ -1,9 +1,9 @@
-"""Unit tests for app.bots.student_bot (Issue #8).
+"""Unit tests for app.bots.go_getter_bot (Issue #8).
 
 Uses unittest.mock to isolate every external dependency:
   - telegram.Update / telegram.ext.ContextTypes objects
   - AsyncSessionLocal (DB)
-  - crud_pupil, crud_task, crud_check_in
+  - crud_go_getter, crud_task, crud_check_in
   - streak_service, praise_engine
 
 No real Telegram API calls and no DB connection are made.
@@ -39,7 +39,7 @@ def _make_context(args: list[str] | None = None):
     return ctx
 
 
-def _make_pupil(chat_id: int = 1, name: str = "Alice"):
+def _make_go_getter(chat_id: int = 1, name: str = "Alice"):
     return SimpleNamespace(
         id=10,
         telegram_chat_id=chat_id,
@@ -71,7 +71,7 @@ def _make_task(task_id: int = 7, milestone_id: int = 1):
 
 @pytest.mark.asyncio
 async def test_cmd_start_sends_welcome():
-    from app.bots.student_bot import cmd_start
+    from app.bots.go_getter_bot import cmd_start
 
     update = _make_update()
     ctx = _make_context()
@@ -82,32 +82,32 @@ async def test_cmd_start_sends_welcome():
 
 
 # ---------------------------------------------------------------------------
-# /today — registered pupil with tasks
+# /today — registered go getter with tasks
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_cmd_today_shows_tasks():
-    from app.bots.student_bot import cmd_today
+    from app.bots.go_getter_bot import cmd_today
 
-    pupil = _make_pupil()
+    go_getter = _make_go_getter()
     task = _make_task()
-    update = _make_update(user_id=pupil.telegram_chat_id)
+    update = _make_update(user_id=go_getter.telegram_chat_id)
     ctx = _make_context()
 
     with (
-        patch("app.bots.student_bot.AsyncSessionLocal") as mock_session_cls,
-        patch("app.bots.student_bot.crud_pupil") as mock_crud_pupil,
-        patch("app.bots.student_bot.crud_task") as mock_crud_task,
-        patch("app.bots.student_bot.crud_check_in") as mock_crud_ci,
+        patch("app.bots.go_getter_bot.AsyncSessionLocal") as mock_session_cls,
+        patch("app.bots.go_getter_bot.crud_go_getter") as mock_crud_go_getter,
+        patch("app.bots.go_getter_bot.crud_task") as mock_crud_task,
+        patch("app.bots.go_getter_bot.crud_check_in") as mock_crud_ci,
     ):
         mock_session = AsyncMock()
         mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        mock_crud_pupil.get_by_chat_id = AsyncMock(return_value=pupil)
+        mock_crud_go_getter.get_by_chat_id = AsyncMock(return_value=go_getter)
         mock_crud_task.get_tasks_for_day = AsyncMock(return_value=[task])
-        mock_crud_ci.get_by_task_and_pupil = AsyncMock(return_value=None)
+        mock_crud_ci.get_by_task_and_go_getter = AsyncMock(return_value=None)
 
         await cmd_today(update, ctx)
 
@@ -117,25 +117,25 @@ async def test_cmd_today_shows_tasks():
 
 
 # ---------------------------------------------------------------------------
-# /today — unregistered pupil
+# /today — unregistered go getter
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_cmd_today_unregistered_pupil():
-    from app.bots.student_bot import cmd_today
+async def test_cmd_today_unregistered_go_getter():
+    from app.bots.go_getter_bot import cmd_today
 
     update = _make_update(user_id=9999)
     ctx = _make_context()
 
     with (
-        patch("app.bots.student_bot.AsyncSessionLocal") as mock_session_cls,
-        patch("app.bots.student_bot.crud_pupil") as mock_crud_pupil,
+        patch("app.bots.go_getter_bot.AsyncSessionLocal") as mock_session_cls,
+        patch("app.bots.go_getter_bot.crud_go_getter") as mock_crud_go_getter,
     ):
         mock_session = AsyncMock()
         mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-        mock_crud_pupil.get_by_chat_id = AsyncMock(return_value=None)
+        mock_crud_go_getter.get_by_chat_id = AsyncMock(return_value=None)
 
         await cmd_today(update, ctx)
 
@@ -150,21 +150,21 @@ async def test_cmd_today_unregistered_pupil():
 
 @pytest.mark.asyncio
 async def test_cmd_today_no_tasks():
-    from app.bots.student_bot import cmd_today
+    from app.bots.go_getter_bot import cmd_today
 
-    pupil = _make_pupil()
-    update = _make_update(user_id=pupil.telegram_chat_id)
+    go_getter = _make_go_getter()
+    update = _make_update(user_id=go_getter.telegram_chat_id)
     ctx = _make_context()
 
     with (
-        patch("app.bots.student_bot.AsyncSessionLocal") as mock_session_cls,
-        patch("app.bots.student_bot.crud_pupil") as mock_crud_pupil,
-        patch("app.bots.student_bot.crud_task") as mock_crud_task,
+        patch("app.bots.go_getter_bot.AsyncSessionLocal") as mock_session_cls,
+        patch("app.bots.go_getter_bot.crud_go_getter") as mock_crud_go_getter,
+        patch("app.bots.go_getter_bot.crud_task") as mock_crud_task,
     ):
         mock_session = AsyncMock()
         mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-        mock_crud_pupil.get_by_chat_id = AsyncMock(return_value=pupil)
+        mock_crud_go_getter.get_by_chat_id = AsyncMock(return_value=go_getter)
         mock_crud_task.get_tasks_for_day = AsyncMock(return_value=[])
 
         await cmd_today(update, ctx)
@@ -180,21 +180,21 @@ async def test_cmd_today_no_tasks():
 
 @pytest.mark.asyncio
 async def test_cmd_checkin_success():
-    from app.bots.student_bot import cmd_checkin
+    from app.bots.go_getter_bot import cmd_checkin
 
-    pupil = _make_pupil()
+    go_getter = _make_go_getter()
     task = _make_task(task_id=7)
     xp_result = SimpleNamespace(xp_earned=12, new_streak=4, badges_earned=[])
-    update = _make_update(user_id=pupil.telegram_chat_id)
+    update = _make_update(user_id=go_getter.telegram_chat_id)
     ctx = _make_context(args=["7"])
 
     with (
-        patch("app.bots.student_bot.AsyncSessionLocal") as mock_session_cls,
-        patch("app.bots.student_bot.crud_pupil") as mock_crud_pupil,
-        patch("app.bots.student_bot.crud_task") as mock_crud_task,
-        patch("app.bots.student_bot.crud_check_in") as mock_crud_ci,
-        patch("app.bots.student_bot.streak_service") as mock_streak,
-        patch("app.bots.student_bot.praise_engine") as mock_praise,
+        patch("app.bots.go_getter_bot.AsyncSessionLocal") as mock_session_cls,
+        patch("app.bots.go_getter_bot.crud_go_getter") as mock_crud_go_getter,
+        patch("app.bots.go_getter_bot.crud_task") as mock_crud_task,
+        patch("app.bots.go_getter_bot.crud_check_in") as mock_crud_ci,
+        patch("app.bots.go_getter_bot.streak_service") as mock_streak,
+        patch("app.bots.go_getter_bot.praise_engine") as mock_praise,
     ):
         mock_session = AsyncMock()
         mock_session.add = MagicMock()
@@ -203,9 +203,9 @@ async def test_cmd_checkin_success():
         mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        mock_crud_pupil.get_by_chat_id = AsyncMock(return_value=pupil)
+        mock_crud_go_getter.get_by_chat_id = AsyncMock(return_value=go_getter)
         mock_crud_task.get = AsyncMock(return_value=task)
-        mock_crud_ci.get_by_task_and_pupil = AsyncMock(return_value=None)
+        mock_crud_ci.get_by_task_and_go_getter = AsyncMock(return_value=None)
         mock_streak.update_streak_and_xp = AsyncMock(return_value=xp_result)
         mock_praise.generate_praise = AsyncMock(return_value="Great work!")
 
@@ -217,7 +217,7 @@ async def test_cmd_checkin_success():
 
 @pytest.mark.asyncio
 async def test_cmd_checkin_bad_args():
-    from app.bots.student_bot import cmd_checkin
+    from app.bots.go_getter_bot import cmd_checkin
 
     update = _make_update()
     ctx = _make_context(args=[])
@@ -235,18 +235,18 @@ async def test_cmd_checkin_bad_args():
 
 @pytest.mark.asyncio
 async def test_cmd_skip_success():
-    from app.bots.student_bot import cmd_skip
+    from app.bots.go_getter_bot import cmd_skip
 
-    pupil = _make_pupil()
+    go_getter = _make_go_getter()
     task = _make_task(task_id=5)
-    update = _make_update(user_id=pupil.telegram_chat_id)
+    update = _make_update(user_id=go_getter.telegram_chat_id)
     ctx = _make_context(args=["5", "too", "hard"])
 
     with (
-        patch("app.bots.student_bot.AsyncSessionLocal") as mock_session_cls,
-        patch("app.bots.student_bot.crud_pupil") as mock_crud_pupil,
-        patch("app.bots.student_bot.crud_task") as mock_crud_task,
-        patch("app.bots.student_bot.crud_check_in") as mock_crud_ci,
+        patch("app.bots.go_getter_bot.AsyncSessionLocal") as mock_session_cls,
+        patch("app.bots.go_getter_bot.crud_go_getter") as mock_crud_go_getter,
+        patch("app.bots.go_getter_bot.crud_task") as mock_crud_task,
+        patch("app.bots.go_getter_bot.crud_check_in") as mock_crud_ci,
     ):
         mock_session = AsyncMock()
         mock_session.add = MagicMock()
@@ -254,9 +254,9 @@ async def test_cmd_skip_success():
         mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        mock_crud_pupil.get_by_chat_id = AsyncMock(return_value=pupil)
+        mock_crud_go_getter.get_by_chat_id = AsyncMock(return_value=go_getter)
         mock_crud_task.get = AsyncMock(return_value=task)
-        mock_crud_ci.get_by_task_and_pupil = AsyncMock(return_value=None)
+        mock_crud_ci.get_by_task_and_go_getter = AsyncMock(return_value=None)
 
         await cmd_skip(update, ctx)
 
@@ -271,28 +271,28 @@ async def test_cmd_skip_success():
 
 @pytest.mark.asyncio
 async def test_cmd_checkin_already_recorded():
-    from app.bots.student_bot import cmd_checkin
+    from app.bots.go_getter_bot import cmd_checkin
     from app.models.check_in import CheckInStatus
 
-    pupil = _make_pupil()
+    go_getter = _make_go_getter()
     task = _make_task(task_id=3)
     existing_ci = SimpleNamespace(status=CheckInStatus.completed, id=99)
-    update = _make_update(user_id=pupil.telegram_chat_id)
+    update = _make_update(user_id=go_getter.telegram_chat_id)
     ctx = _make_context(args=["3"])
 
     with (
-        patch("app.bots.student_bot.AsyncSessionLocal") as mock_session_cls,
-        patch("app.bots.student_bot.crud_pupil") as mock_crud_pupil,
-        patch("app.bots.student_bot.crud_task") as mock_crud_task,
-        patch("app.bots.student_bot.crud_check_in") as mock_crud_ci,
+        patch("app.bots.go_getter_bot.AsyncSessionLocal") as mock_session_cls,
+        patch("app.bots.go_getter_bot.crud_go_getter") as mock_crud_go_getter,
+        patch("app.bots.go_getter_bot.crud_task") as mock_crud_task,
+        patch("app.bots.go_getter_bot.crud_check_in") as mock_crud_ci,
     ):
         mock_session = AsyncMock()
         mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        mock_crud_pupil.get_by_chat_id = AsyncMock(return_value=pupil)
+        mock_crud_go_getter.get_by_chat_id = AsyncMock(return_value=go_getter)
         mock_crud_task.get = AsyncMock(return_value=task)
-        mock_crud_ci.get_by_task_and_pupil = AsyncMock(return_value=existing_ci)
+        mock_crud_ci.get_by_task_and_go_getter = AsyncMock(return_value=existing_ci)
 
         await cmd_checkin(update, ctx)
 
@@ -307,7 +307,7 @@ async def test_cmd_checkin_already_recorded():
 
 @pytest.mark.asyncio
 async def test_cmd_unknown_replies():
-    from app.bots.student_bot import cmd_unknown
+    from app.bots.go_getter_bot import cmd_unknown
 
     update = _make_update()
     ctx = _make_context()

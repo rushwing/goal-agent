@@ -1,5 +1,5 @@
 /**
- * Typed axios HTTP client for the Study Planner API.
+ * Typed axios HTTP client for the Goal Agent API.
  * Injects X-Telegram-Chat-Id from plugin config on every request.
  *
  * HMAC signing (Issue #3):

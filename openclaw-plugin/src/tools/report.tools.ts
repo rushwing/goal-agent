@@ -3,7 +3,7 @@ import { AxiosInstance } from "axios";
 export function registerReportTools(client: AxiosInstance) {
   return {
     generate_daily_report: async (args: {
-      pupil_id?: number;
+      go_getter_id?: number;
       report_date?: string;
     }) => {
       const { data } = await client.post("/reports/daily", null, { params: args });
@@ -11,7 +11,7 @@ export function registerReportTools(client: AxiosInstance) {
     },
 
     generate_weekly_report: async (args: {
-      pupil_id?: number;
+      go_getter_id?: number;
       week_start?: string;
     }) => {
       const { data } = await client.post("/reports/weekly", null, { params: args });
@@ -19,7 +19,7 @@ export function registerReportTools(client: AxiosInstance) {
     },
 
     generate_monthly_report: async (args: {
-      pupil_id?: number;
+      go_getter_id?: number;
       year?: number;
       month?: number;
     }) => {
@@ -28,7 +28,7 @@ export function registerReportTools(client: AxiosInstance) {
     },
 
     list_reports: async (args: {
-      pupil_id?: number;
+      go_getter_id?: number;
       report_type?: string;
       limit?: number;
     }) => {

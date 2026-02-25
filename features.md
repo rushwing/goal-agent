@@ -1,4 +1,4 @@
-# Vacation Study Planner – Feature Stages
+# Goal Agent – Feature Stages
 
 ## Stage 1: Foundation (Critical)
 - [x] Project setup (pyproject.toml, .env.example)
@@ -6,7 +6,7 @@
 - [x] Alembic async migrations
 - [x] Generic CRUD base + individual CRUD modules
 - [x] FastMCP server with role-based auth (X-Telegram-Chat-Id)
-- [x] Admin MCP tools: add/update/remove/list pupils & parents
+- [x] Admin MCP tools: add/update/remove/list go_getters & best_pals
 - [x] FastAPI main app + FastMCP mount (single process)
 
 ## Stage 2: Planning Engine (Critical)
@@ -21,7 +21,7 @@
 - [x] Streak service: XP formula, streak_multiplier, mood_bonus
 - [x] Achievement unlocking (first_checkin, streak_3/7/14/30, xp milestones)
 - [x] Praise engine: LLM + 20+ offline fallback templates
-- [x] Check-in MCP tools: list_today_tasks, list_week_tasks, checkin_task, skip_task, get_pupil_progress
+- [x] Check-in MCP tools: list_today_tasks, list_week_tasks, checkin_task, skip_task, get_go_getter_progress
 
 ## Stage 4: Reports (High)
 - [x] Daily report (Markdown, GitHub commit)
@@ -30,14 +30,14 @@
 - [x] Report MCP tools: generate_daily/weekly/monthly_report, list_reports
 
 ## Stage 5: Telegram & OpenClaw Integration (High)
-- [x] Telegram service (httpx async, parent + pupil bots)
+- [x] Telegram service (httpx async, best_pal + go_getter bots)
 - [x] APScheduler cron jobs (morning tasks, evening reminders, weekly/monthly reports)
 - [x] OpenClaw TypeScript plugin (axios HTTP client, X-Telegram-Chat-Id injection)
 - [x] Group notifications for reports
 
 ## Stage 6: Gamification+ (Medium)
 - [ ] Extended badge catalogue (subject mastery, consistency champion, etc.)
-- [ ] Sibling leaderboard (if multiple pupils)
+- [ ] Sibling leaderboard (if multiple go getters)
 - [ ] Streak freeze mechanic (bank freeze days via XP)
 - [ ] XP shop (redeem XP for streak freezes or bonus praise)
 

@@ -14,23 +14,23 @@ from app.schemas.check_in import CheckInCreate, CheckInResponse
 
 
 class CRUDCheckIn(CRUDBase[CheckIn, CheckInCreate, CheckInResponse]):
-    async def get_by_task_and_pupil(
-        self, db: AsyncSession, task_id: int, pupil_id: int
+    async def get_by_task_and_go_getter(
+        self, db: AsyncSession, task_id: int, go_getter_id: int
     ) -> Optional[CheckIn]:
         result = await db.execute(
-            select(CheckIn).where(CheckIn.task_id == task_id, CheckIn.pupil_id == pupil_id)
+            select(CheckIn).where(CheckIn.task_id == task_id, CheckIn.go_getter_id == go_getter_id)
         )
         return result.scalar_one_or_none()
 
     async def get_completed_for_period(
-        self, db: AsyncSession, pupil_id: int, start: date, end: date
+        self, db: AsyncSession, go_getter_id: int, start: date, end: date
     ) -> Sequence[CheckIn]:
         result = await db.execute(
             select(CheckIn)
             .join(Task, CheckIn.task_id == Task.id)
             .join(WeeklyMilestone, Task.milestone_id == WeeklyMilestone.id)
             .where(
-                CheckIn.pupil_id == pupil_id,
+                CheckIn.go_getter_id == go_getter_id,
                 CheckIn.status == CheckInStatus.completed,
                 WeeklyMilestone.start_date <= end,
                 WeeklyMilestone.end_date >= start,
@@ -38,13 +38,13 @@ class CRUDCheckIn(CRUDBase[CheckIn, CheckInCreate, CheckInResponse]):
         )
         return result.scalars().all()
 
-    async def count_completed_today(self, db: AsyncSession, pupil_id: int, today: date) -> int:
+    async def count_completed_today(self, db: AsyncSession, go_getter_id: int, today: date) -> int:
         result = await db.execute(
             select(func.count(CheckIn.id))
             .join(Task, CheckIn.task_id == Task.id)
             .join(WeeklyMilestone, Task.milestone_id == WeeklyMilestone.id)
             .where(
-                CheckIn.pupil_id == pupil_id,
+                CheckIn.go_getter_id == go_getter_id,
                 CheckIn.status == CheckInStatus.completed,
                 WeeklyMilestone.start_date <= today,
                 WeeklyMilestone.end_date >= today,

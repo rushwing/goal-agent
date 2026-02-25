@@ -1,12 +1,12 @@
 {
-  "name": "vacation-study-planner",
+  "name": "goal-agent",
   "version": "0.1.0",
-  "description": "AI-powered vacation study planner tools",
+  "description": "AI-powered goal and habit tracking agent tools",
   "main": "dist/index.js",
   "config": {
     "apiBaseUrl": {
       "type": "string",
-      "description": "Base URL of the study planner API (e.g. http://192.168.1.100:8000/api/v1)",
+      "description": "Base URL of the Goal Agent API (e.g. http://192.168.1.100:8000/api/v1)",
       "required": true
     },
     "telegramChatId": {
@@ -16,11 +16,11 @@
     }
   },
   "tools": [
-    "add_pupil", "update_pupil", "remove_pupil", "list_pupils",
-    "add_parent", "update_parent", "remove_parent", "list_parents",
+    "add_go_getter", "update_go_getter", "remove_go_getter", "list_go_getters",
+    "add_best_pal", "update_best_pal", "remove_best_pal", "list_best_pals",
     "create_target", "update_target", "delete_target", "list_targets",
     "generate_plan", "update_plan", "delete_plan", "list_plans", "get_plan_detail",
-    "list_today_tasks", "list_week_tasks", "checkin_task", "skip_task", "get_pupil_progress",
+    "list_today_tasks", "list_week_tasks", "checkin_task", "skip_task", "get_go_getter_progress",
     "generate_daily_report", "generate_weekly_report", "generate_monthly_report", "list_reports"
   ]
 }

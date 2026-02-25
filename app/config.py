@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Database
-    DATABASE_URL: str = "mysql+aiomysql://planner:password@localhost:3306/vocation_planner"
+    DATABASE_URL: str = "mysql+aiomysql://planner:password@localhost:3306/goal_agent"
 
     # Kimi AI
     KIMI_API_KEY: str = "sk-placeholder"
@@ -18,14 +18,14 @@ class Settings(BaseSettings):
     KIMI_MODEL_LONG: str = "moonshot-v1-32k"
 
     # Telegram
-    TELEGRAM_PARENT_BOT_TOKEN: str = ""
-    TELEGRAM_PUPIL_BOT_TOKEN: str = ""
+    TELEGRAM_BEST_PAL_BOT_TOKEN: str = ""
+    TELEGRAM_GO_GETTER_BOT_TOKEN: str = ""
     TELEGRAM_GROUP_CHAT_ID: str = ""
 
     # GitHub
     GITHUB_PAT: str = ""
     GITHUB_DATA_REPO: str = "username/study-data-private"
-    GITHUB_COMMITTER_NAME: str = "Study Planner Bot"
+    GITHUB_COMMITTER_NAME: str = "Goal Agent Bot"
     GITHUB_COMMITTER_EMAIL: str = "bot@example.com"
 
     # App

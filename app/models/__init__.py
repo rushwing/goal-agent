@@ -1,6 +1,6 @@
 from app.models.base import Base, TimestampMixin
-from app.models.pupil import Pupil
-from app.models.parent import Parent
+from app.models.go_getter import GoGetter
+from app.models.best_pal import BestPal
 from app.models.target import Target, VacationType, TargetStatus
 from app.models.plan import Plan, PlanStatus
 from app.models.weekly_milestone import WeeklyMilestone
@@ -19,8 +19,8 @@ from app.models.notification import (
 __all__ = [
     "Base",
     "TimestampMixin",
-    "Pupil",
-    "Parent",
+    "GoGetter",
+    "BestPal",
     "Target",
     "VacationType",
     "TargetStatus",

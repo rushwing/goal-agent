@@ -1,4 +1,4 @@
-"""Plan MCP tools: targets and AI plan generation (role: parent/admin)."""
+"""Plan MCP tools: targets and AI plan generation (role: best_pal/admin)."""
 
 import logging
 from datetime import date
@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.database import AsyncSessionLocal
 from app.mcp.auth import Role, require_role
 from app.mcp.server import mcp
-from app.crud import crud_pupil, crud_target, crud_plan
+from app.crud import crud_go_getter, crud_target, crud_plan
 from app.schemas.target import TargetCreate, TargetUpdate
 from app.schemas.plan import PlanUpdate
 from app.models.plan import Plan
@@ -30,7 +30,7 @@ def _require_chat_id(chat_id: Optional[int]) -> int:
 
 @mcp.tool()
 async def create_target(
-    pupil_id: int,
+    go_getter_id: int,
     title: str,
     subject: str,
     description: str,
@@ -39,12 +39,12 @@ async def create_target(
     priority: int = 3,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
-    """Create a learning target for a pupil. Requires parent/admin role."""
+    """Create a learning target for a go getter. Requires best_pal/admin role."""
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent])
+        await require_role(db, caller_id, [Role.admin, Role.best_pal])
         schema = TargetCreate(
-            pupil_id=pupil_id,
+            go_getter_id=go_getter_id,
             title=title,
             subject=subject,
             description=description,
@@ -58,7 +58,7 @@ async def create_target(
             "id": target.id,
             "title": target.title,
             "subject": target.subject,
-            "pupil_id": target.pupil_id,
+            "go_getter_id": target.go_getter_id,
         }
 
 
@@ -72,10 +72,10 @@ async def update_target(
     status: Optional[str] = None,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
-    """Update a learning target. Requires parent/admin role."""
+    """Update a learning target. Requires best_pal/admin role."""
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent])
+        await require_role(db, caller_id, [Role.admin, Role.best_pal])
         target = await crud_target.get(db, target_id)
         if not target:
             raise ValueError(f"Target {target_id} not found")
@@ -109,14 +109,14 @@ async def delete_target(
 
 @mcp.tool()
 async def list_targets(
-    pupil_id: int,
+    go_getter_id: int,
     x_telegram_chat_id: Optional[int] = None,
 ) -> list[dict]:
-    """List targets for a pupil. Requires parent/admin role."""
+    """List targets for a go getter. Requires best_pal/admin role."""
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent])
-        targets = await crud_target.get_by_pupil(db, pupil_id)
+        await require_role(db, caller_id, [Role.admin, Role.best_pal])
+        targets = await crud_target.get_by_go_getter(db, go_getter_id)
         return [
             {"id": t.id, "title": t.title, "subject": t.subject, "status": t.status.value}
             for t in targets
@@ -136,7 +136,7 @@ async def generate_plan(
     """
     Generate an AI-powered study plan for a target using Kimi.
     Automatically commits the plan to GitHub.
-    Requires parent/admin role.
+    Requires best_pal/admin role.
     """
     caller_id = _require_chat_id(x_telegram_chat_id)
     if preferred_days is None:
@@ -146,21 +146,21 @@ async def generate_plan(
     end = date.fromisoformat(end_date)
 
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent])
+        await require_role(db, caller_id, [Role.admin, Role.best_pal])
 
         target = await crud_target.get(db, target_id)
         if not target:
             raise ValueError(f"Target {target_id} not found")
 
-        pupil = await crud_pupil.get(db, target.pupil_id)
-        if not pupil:
-            raise ValueError(f"Pupil {target.pupil_id} not found")
+        go_getter = await crud_go_getter.get(db, target.go_getter_id)
+        if not go_getter:
+            raise ValueError(f"Go getter {target.go_getter_id} not found")
 
         plan = await plan_generator.generate_plan(
             db=db,
             target=target,
-            pupil_name=pupil.name,
-            grade=pupil.grade,
+            pupil_name=go_getter.name,
+            grade=go_getter.grade,
             start_date=start,
             end_date=end,
             daily_study_minutes=daily_study_minutes,
@@ -175,11 +175,11 @@ async def generate_plan(
             .where(Plan.id == plan.id)
         )
         full_plan = result.scalar_one()
-        md = _plan_to_markdown(full_plan, pupil.name, target)
+        md = _plan_to_markdown(full_plan, go_getter.name, target)
 
         try:
             sha, path = await github_service.commit_plan(
-                pupil.name, target.vacation_type.value, target.vacation_year, plan.title, md
+                go_getter.name, target.vacation_type.value, target.vacation_year, plan.title, md
             )
             plan.github_commit_sha = sha
             plan.github_file_path = path
@@ -204,7 +204,7 @@ def _plan_to_markdown(plan, pupil_name: str, target) -> str:
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     lines = [
         f"# {plan.title}",
-        f"**Pupil:** {pupil_name}",
+        f"**Go Getter:** {pupil_name}",
         f"**Subject:** {target.subject}",
         f"**Period:** {plan.start_date} – {plan.end_date}",
         f"",
@@ -240,10 +240,10 @@ async def update_plan(
     status: Optional[str] = None,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
-    """Update a plan's title or status. Requires parent/admin role."""
+    """Update a plan's title or status. Requires best_pal/admin role."""
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent])
+        await require_role(db, caller_id, [Role.admin, Role.best_pal])
         plan = await crud_plan.get(db, plan_id)
         if not plan:
             raise ValueError(f"Plan {plan_id} not found")
@@ -276,16 +276,16 @@ async def delete_plan(
 
 @mcp.tool()
 async def list_plans(
-    pupil_id: Optional[int] = None,
+    go_getter_id: Optional[int] = None,
     target_id: Optional[int] = None,
     x_telegram_chat_id: Optional[int] = None,
 ) -> list[dict]:
-    """List plans. Requires parent/admin role."""
+    """List plans. Requires best_pal/admin role."""
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent])
-        if pupil_id:
-            plans = await crud_plan.get_by_pupil(db, pupil_id, target_id)
+        await require_role(db, caller_id, [Role.admin, Role.best_pal])
+        if go_getter_id:
+            plans = await crud_plan.get_by_go_getter(db, go_getter_id, target_id)
         else:
             plans = await crud_plan.get_multi(db)
         return [
@@ -305,10 +305,10 @@ async def get_plan_detail(
     plan_id: int,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
-    """Get full plan with milestones and tasks. Requires parent/admin role."""
+    """Get full plan with milestones and tasks. Requires best_pal/admin role."""
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent])
+        await require_role(db, caller_id, [Role.admin, Role.best_pal])
         plan = await crud_plan.get_with_milestones(db, plan_id)
         if not plan:
             raise ValueError(f"Plan {plan_id} not found")

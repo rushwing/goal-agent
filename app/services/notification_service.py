@@ -25,7 +25,7 @@ async def send_and_log(
     message_text: str,
     notification_type: NotificationType,
     channel: NotificationChannel,
-    use_pupil_bot: bool = False,
+    use_go_getter_bot: bool = False,
 ) -> Notification:
     notification = Notification(
         recipient_type=recipient_type,
@@ -42,10 +42,10 @@ async def send_and_log(
     try:
         if channel == NotificationChannel.telegram_group:
             ok = await telegram_service.send_to_group(message_text)
-        elif use_pupil_bot:
-            ok = await telegram_service.send_to_pupil(chat_id, message_text)
+        elif use_go_getter_bot:
+            ok = await telegram_service.send_to_go_getter(chat_id, message_text)
         else:
-            ok = await telegram_service.send_to_parent(chat_id, message_text)
+            ok = await telegram_service.send_to_best_pal(chat_id, message_text)
 
         notification.status = NotificationStatus.sent if ok else NotificationStatus.failed
         notification.sent_at = datetime.utcnow()

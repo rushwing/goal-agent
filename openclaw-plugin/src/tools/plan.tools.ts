@@ -3,7 +3,7 @@ import { AxiosInstance } from "axios";
 export function registerPlanTools(client: AxiosInstance) {
   return {
     create_target: async (args: {
-      pupil_id: number;
+      go_getter_id: number;
       title: string;
       subject: string;
       description: string;
@@ -33,8 +33,8 @@ export function registerPlanTools(client: AxiosInstance) {
       return data;
     },
 
-    list_targets: async (args: { pupil_id: number }) => {
-      const { data } = await client.get("/targets", { params: { pupil_id: args.pupil_id } });
+    list_targets: async (args: { go_getter_id: number }) => {
+      const { data } = await client.get("/targets", { params: { go_getter_id: args.go_getter_id } });
       return data;
     },
 
@@ -61,7 +61,7 @@ export function registerPlanTools(client: AxiosInstance) {
       return data;
     },
 
-    list_plans: async (args: { pupil_id?: number; target_id?: number }) => {
+    list_plans: async (args: { go_getter_id?: number; target_id?: number }) => {
       const { data } = await client.get("/plans", { params: args });
       return data;
     },

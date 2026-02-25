@@ -16,7 +16,7 @@ from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.task import Task
-    from app.models.pupil import Pupil
+    from app.models.go_getter import GoGetter
 
 
 class CheckInStatus(str, enum.Enum):
@@ -26,11 +26,11 @@ class CheckInStatus(str, enum.Enum):
 
 class CheckIn(Base, TimestampMixin):
     __tablename__ = "check_ins"
-    __table_args__ = (UniqueConstraint("task_id", "pupil_id", name="uq_checkin_task_pupil"),)
+    __table_args__ = (UniqueConstraint("task_id", "go_getter_id", name="uq_checkin_task_go_getter"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     task_id: Mapped[int] = mapped_column(Integer, ForeignKey("tasks.id"), nullable=False)
-    pupil_id: Mapped[int] = mapped_column(Integer, ForeignKey("pupils.id"), nullable=False)
+    go_getter_id: Mapped[int] = mapped_column(Integer, ForeignKey("go_getters.id"), nullable=False)
     status: Mapped[CheckInStatus] = mapped_column(
         Enum(CheckInStatus), nullable=False, default=CheckInStatus.completed
     )
@@ -44,4 +44,4 @@ class CheckIn(Base, TimestampMixin):
 
     # Relationships
     task: Mapped["Task"] = relationship("Task", back_populates="check_ins")
-    pupil: Mapped["Pupil"] = relationship("Pupil", back_populates="check_ins")
+    go_getter: Mapped["GoGetter"] = relationship("GoGetter", back_populates="check_ins")

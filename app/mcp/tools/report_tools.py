@@ -1,4 +1,4 @@
-"""Report MCP tools: generate and list reports (role: parent/admin for any pupil; pupil for own)."""
+"""Report MCP tools: generate and list reports (role: best_pal/admin for any go_getter; go_getter for own)."""
 
 from datetime import date
 from typing import Optional
@@ -6,7 +6,7 @@ from typing import Optional
 from app.database import AsyncSessionLocal
 from app.mcp.auth import Role, require_role, resolve_role
 from app.mcp.server import mcp
-from app.crud import crud_pupil, crud_report
+from app.crud import crud_go_getter, crud_report
 from app.models.report import ReportType
 from app.services import report_service
 
@@ -17,40 +17,38 @@ def _require_chat_id(chat_id: Optional[int]) -> int:
     return chat_id
 
 
-async def _resolve_pupil(db, caller_id: int, pupil_id: Optional[int]):
-    """Resolve pupil_id: parents can specify any pupil, pupils use their own."""
-    from app.models.pupil import Pupil
-
+async def _resolve_go_getter(db, caller_id: int, go_getter_id: Optional[int]):
+    """Resolve go_getter_id: best_pals can specify any go_getter, go_getters use their own."""
     role = await resolve_role(db, caller_id)
-    if role in (Role.admin, Role.parent):
-        if pupil_id is None:
-            raise ValueError("pupil_id is required for parent/admin role")
-        pupil = await crud_pupil.get(db, pupil_id)
+    if role in (Role.admin, Role.best_pal):
+        if go_getter_id is None:
+            raise ValueError("go_getter_id is required for best_pal/admin role")
+        go_getter = await crud_go_getter.get(db, go_getter_id)
     else:
-        # Pupil uses their own record
-        pupil = await crud_pupil.get_by_chat_id(db, caller_id)
+        # Go getter uses their own record
+        go_getter = await crud_go_getter.get_by_chat_id(db, caller_id)
 
-    if not pupil:
-        raise ValueError("Pupil not found")
-    return pupil
+    if not go_getter:
+        raise ValueError("Go getter not found")
+    return go_getter
 
 
 @mcp.tool()
 async def generate_daily_report(
-    pupil_id: Optional[int] = None,
+    go_getter_id: Optional[int] = None,
     report_date: Optional[str] = None,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
     """
     Generate a daily progress report. Commits to GitHub.
-    Parent/admin: specify pupil_id. Pupil: reports on self.
+    Best pal/admin: specify go_getter_id. Go getter: reports on self.
     """
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent, Role.pupil])
-        pupil = await _resolve_pupil(db, caller_id, pupil_id)
+        await require_role(db, caller_id, [Role.admin, Role.best_pal, Role.go_getter])
+        go_getter = await _resolve_go_getter(db, caller_id, go_getter_id)
         rdate = date.fromisoformat(report_date) if report_date else date.today()
-        report = await report_service.generate_daily_report(db, pupil, rdate)
+        report = await report_service.generate_daily_report(db, go_getter, rdate)
         await db.commit()
         return {
             "report_id": report.id,
@@ -64,17 +62,17 @@ async def generate_daily_report(
 
 @mcp.tool()
 async def generate_weekly_report(
-    pupil_id: Optional[int] = None,
+    go_getter_id: Optional[int] = None,
     week_start: Optional[str] = None,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
     """Generate a weekly progress report. Commits to GitHub."""
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent, Role.pupil])
-        pupil = await _resolve_pupil(db, caller_id, pupil_id)
+        await require_role(db, caller_id, [Role.admin, Role.best_pal, Role.go_getter])
+        go_getter = await _resolve_go_getter(db, caller_id, go_getter_id)
         ws = date.fromisoformat(week_start) if week_start else None
-        report = await report_service.generate_weekly_report(db, pupil, ws)
+        report = await report_service.generate_weekly_report(db, go_getter, ws)
         await db.commit()
         return {
             "report_id": report.id,
@@ -89,7 +87,7 @@ async def generate_weekly_report(
 
 @mcp.tool()
 async def generate_monthly_report(
-    pupil_id: Optional[int] = None,
+    go_getter_id: Optional[int] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
     x_telegram_chat_id: Optional[int] = None,
@@ -97,9 +95,9 @@ async def generate_monthly_report(
     """Generate a monthly progress report. Commits to GitHub."""
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent, Role.pupil])
-        pupil = await _resolve_pupil(db, caller_id, pupil_id)
-        report = await report_service.generate_monthly_report(db, pupil, year, month)
+        await require_role(db, caller_id, [Role.admin, Role.best_pal, Role.go_getter])
+        go_getter = await _resolve_go_getter(db, caller_id, go_getter_id)
+        report = await report_service.generate_monthly_report(db, go_getter, year, month)
         await db.commit()
         return {
             "report_id": report.id,
@@ -114,18 +112,18 @@ async def generate_monthly_report(
 
 @mcp.tool()
 async def list_reports(
-    pupil_id: Optional[int] = None,
+    go_getter_id: Optional[int] = None,
     report_type: Optional[str] = None,
     limit: int = 10,
     x_telegram_chat_id: Optional[int] = None,
 ) -> list[dict]:
-    """List reports for a pupil. Parent/admin: specify pupil_id. Pupil: lists own reports."""
+    """List reports for a go getter. Best pal/admin: specify go_getter_id. Go getter: lists own reports."""
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin, Role.parent, Role.pupil])
-        pupil = await _resolve_pupil(db, caller_id, pupil_id)
+        await require_role(db, caller_id, [Role.admin, Role.best_pal, Role.go_getter])
+        go_getter = await _resolve_go_getter(db, caller_id, go_getter_id)
         rt = ReportType(report_type) if report_type else None
-        reports = await crud_report.get_by_pupil(db, pupil.id, rt, limit)
+        reports = await crud_report.get_by_go_getter(db, go_getter.id, rt, limit)
         return [
             {
                 "id": r.id,

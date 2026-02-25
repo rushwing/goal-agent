@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.check_in import CheckIn, CheckInStatus
-from app.models.pupil import Pupil
+from app.models.go_getter import GoGetter
 from app.models.report import Report, ReportType
 from app.services import llm_service, github_service
 from app.crud.reports import crud_report
@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 async def _fetch_check_ins(
-    db: AsyncSession, pupil_id: int, start: date, end: date
+    db: AsyncSession, go_getter_id: int, start: date, end: date
 ) -> list[CheckIn]:
     """Fetch check-ins by actual event date (created_at), not milestone coverage."""
     result = await db.execute(
         select(CheckIn).where(
-            CheckIn.pupil_id == pupil_id,
+            CheckIn.go_getter_id == go_getter_id,
             func.date(CheckIn.created_at) >= start,
             func.date(CheckIn.created_at) <= end,
         )
@@ -41,12 +41,12 @@ def _build_stats(check_ins: list[CheckIn]) -> dict:
 REPORT_SYSTEM = (
     "You are a friendly, encouraging study coach writing a progress report for a family. "
     "Write in Markdown. Be positive but honest. Highlight achievements and suggest improvements. "
-    "Keep the report concise and parent-friendly."
+    "Keep the report concise and easy to read."
 )
 
 
 async def _generate_content(
-    pupil_name: str,
+    go_getter_name: str,
     grade: str,
     report_type: str,
     period_label: str,
@@ -58,7 +58,7 @@ async def _generate_content(
         for c in check_ins[:30]  # cap context
     )
     user_prompt = (
-        f"Student: {pupil_name} (Grade {grade})\n"
+        f"Go Getter: {go_getter_name} (Grade {grade})\n"
         f"Report type: {report_type}\n"
         f"Period: {period_label}\n\n"
         f"Statistics:\n"
@@ -81,13 +81,15 @@ async def _generate_content(
         return content.strip()
     except Exception as exc:
         logger.warning("LLM report generation failed, using fallback: %s", exc)
-        return _fallback_report(pupil_name, report_type, period_label, stats)
+        return _fallback_report(go_getter_name, report_type, period_label, stats)
 
 
-def _fallback_report(pupil_name: str, report_type: str, period_label: str, stats: dict) -> str:
+def _fallback_report(
+    go_getter_name: str, report_type: str, period_label: str, stats: dict
+) -> str:
     completion_pct = round(stats["completed"] / stats["total"] * 100) if stats["total"] > 0 else 0
     return (
-        f"# {report_type.capitalize()} Report – {pupil_name}\n\n"
+        f"# {report_type.capitalize()} Report – {go_getter_name}\n\n"
         f"**Period:** {period_label}\n\n"
         f"## Summary\n\n"
         f"- **Tasks completed:** {stats['completed']} / {stats['total']} ({completion_pct}%)\n"
@@ -97,27 +99,27 @@ def _fallback_report(pupil_name: str, report_type: str, period_label: str, stats
 
 
 async def generate_daily_report(
-    db: AsyncSession, pupil: Pupil, report_date: Optional[date] = None
+    db: AsyncSession, go_getter: GoGetter, report_date: Optional[date] = None
 ) -> Report:
     report_date = report_date or date.today()
-    existing = await crud_report.get_existing(db, pupil.id, ReportType.daily, report_date)
+    existing = await crud_report.get_existing(db, go_getter.id, ReportType.daily, report_date)
     if existing:
         logger.info(
-            "Daily report for pupil %d on %s already exists (id=%d), reusing",
-            pupil.id,
+            "Daily report for go getter %d on %s already exists (id=%d), reusing",
+            go_getter.id,
             report_date,
             existing.id,
         )
         return existing
-    check_ins = await _fetch_check_ins(db, pupil.id, report_date, report_date)
+    check_ins = await _fetch_check_ins(db, go_getter.id, report_date, report_date)
     stats = _build_stats(check_ins)
     period_label = str(report_date)
     content = await _generate_content(
-        pupil.name, pupil.grade, "daily", period_label, stats, check_ins
+        go_getter.name, go_getter.grade, "daily", period_label, stats, check_ins
     )
 
     report = Report(
-        pupil_id=pupil.id,
+        go_getter_id=go_getter.id,
         report_type=ReportType.daily,
         period_start=report_date,
         period_end=report_date,
@@ -132,7 +134,7 @@ async def generate_daily_report(
 
     try:
         sha, path = await github_service.commit_report(
-            pupil.name, "daily", report_date.year, period_label, content
+            go_getter.name, "daily", report_date.year, period_label, content
         )
         report.github_commit_sha = sha
         report.github_file_path = path
@@ -144,30 +146,30 @@ async def generate_daily_report(
 
 
 async def generate_weekly_report(
-    db: AsyncSession, pupil: Pupil, week_start: Optional[date] = None
+    db: AsyncSession, go_getter: GoGetter, week_start: Optional[date] = None
 ) -> Report:
     if week_start is None:
         today = date.today()
         week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
-    existing = await crud_report.get_existing(db, pupil.id, ReportType.weekly, week_start)
+    existing = await crud_report.get_existing(db, go_getter.id, ReportType.weekly, week_start)
     if existing:
         logger.info(
-            "Weekly report for pupil %d week_start=%s already exists (id=%d), reusing",
-            pupil.id,
+            "Weekly report for go getter %d week_start=%s already exists (id=%d), reusing",
+            go_getter.id,
             week_start,
             existing.id,
         )
         return existing
-    check_ins = await _fetch_check_ins(db, pupil.id, week_start, week_end)
+    check_ins = await _fetch_check_ins(db, go_getter.id, week_start, week_end)
     stats = _build_stats(check_ins)
     period_label = f"week_{week_start.isocalendar().week:02d}_{week_start.year}"
     content = await _generate_content(
-        pupil.name, pupil.grade, "weekly", f"{week_start} to {week_end}", stats, check_ins
+        go_getter.name, go_getter.grade, "weekly", f"{week_start} to {week_end}", stats, check_ins
     )
 
     report = Report(
-        pupil_id=pupil.id,
+        go_getter_id=go_getter.id,
         report_type=ReportType.weekly,
         period_start=week_start,
         period_end=week_end,
@@ -182,7 +184,7 @@ async def generate_weekly_report(
 
     try:
         sha, path = await github_service.commit_report(
-            pupil.name, "weekly", week_start.year, period_label, content
+            go_getter.name, "weekly", week_start.year, period_label, content
         )
         report.github_commit_sha = sha
         report.github_file_path = path
@@ -194,7 +196,7 @@ async def generate_weekly_report(
 
 
 async def generate_monthly_report(
-    db: AsyncSession, pupil: Pupil, year: Optional[int] = None, month: Optional[int] = None
+    db: AsyncSession, go_getter: GoGetter, year: Optional[int] = None, month: Optional[int] = None
 ) -> Report:
     today = date.today()
     year = year or today.year
@@ -206,25 +208,25 @@ async def generate_monthly_report(
     else:
         period_end = date(year, month + 1, 1) - timedelta(days=1)
 
-    existing = await crud_report.get_existing(db, pupil.id, ReportType.monthly, period_start)
+    existing = await crud_report.get_existing(db, go_getter.id, ReportType.monthly, period_start)
     if existing:
         logger.info(
-            "Monthly report for pupil %d %d-%02d already exists (id=%d), reusing",
-            pupil.id,
+            "Monthly report for go getter %d %d-%02d already exists (id=%d), reusing",
+            go_getter.id,
             year,
             month,
             existing.id,
         )
         return existing
-    check_ins = await _fetch_check_ins(db, pupil.id, period_start, period_end)
+    check_ins = await _fetch_check_ins(db, go_getter.id, period_start, period_end)
     stats = _build_stats(check_ins)
     period_label = f"{year}_{month:02d}"
     content = await _generate_content(
-        pupil.name, pupil.grade, "monthly", f"{year}-{month:02d}", stats, check_ins
+        go_getter.name, go_getter.grade, "monthly", f"{year}-{month:02d}", stats, check_ins
     )
 
     report = Report(
-        pupil_id=pupil.id,
+        go_getter_id=go_getter.id,
         report_type=ReportType.monthly,
         period_start=period_start,
         period_end=period_end,
@@ -239,7 +241,7 @@ async def generate_monthly_report(
 
     try:
         sha, path = await github_service.commit_report(
-            pupil.name, "monthly", year, period_label, content
+            go_getter.name, "monthly", year, period_label, content
         )
         report.github_commit_sha = sha
         report.github_file_path = path

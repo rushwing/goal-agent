@@ -9,8 +9,8 @@ from app.models.base import Base, TimestampMixin
 
 
 class RecipientType(str, enum.Enum):
-    pupil = "pupil"
-    parent = "parent"
+    go_getter = "go_getter"
+    best_pal = "best_pal"
     group = "group"
 
 

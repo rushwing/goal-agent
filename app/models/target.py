@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.pupil import Pupil
+    from app.models.go_getter import GoGetter
     from app.models.plan import Plan
 
 import enum
@@ -30,7 +30,7 @@ class Target(Base, TimestampMixin):
     __tablename__ = "targets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    pupil_id: Mapped[int] = mapped_column(Integer, ForeignKey("pupils.id"), nullable=False)
+    go_getter_id: Mapped[int] = mapped_column(Integer, ForeignKey("go_getters.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     subject: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -44,5 +44,5 @@ class Target(Base, TimestampMixin):
     )
 
     # Relationships
-    pupil: Mapped["Pupil"] = relationship("Pupil", back_populates="targets")
+    go_getter: Mapped["GoGetter"] = relationship("GoGetter", back_populates="targets")
     plans: Mapped[list["Plan"]] = relationship("Plan", back_populates="target")

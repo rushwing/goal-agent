@@ -10,14 +10,14 @@ from app.schemas.report import ReportResponse, ReportSummary
 
 
 class CRUDReport(CRUDBase[Report, ReportResponse, ReportSummary]):
-    async def get_by_pupil(
+    async def get_by_go_getter(
         self,
         db: AsyncSession,
-        pupil_id: int,
+        go_getter_id: int,
         report_type: Optional[ReportType] = None,
         limit: int = 20,
     ) -> Sequence[Report]:
-        query = select(Report).where(Report.pupil_id == pupil_id)
+        query = select(Report).where(Report.go_getter_id == go_getter_id)
         if report_type:
             query = query.where(Report.report_type == report_type)
         query = query.order_by(Report.period_start.desc()).limit(limit)
@@ -25,11 +25,11 @@ class CRUDReport(CRUDBase[Report, ReportResponse, ReportSummary]):
         return result.scalars().all()
 
     async def get_existing(
-        self, db: AsyncSession, pupil_id: int, report_type: ReportType, period_start: date
+        self, db: AsyncSession, go_getter_id: int, report_type: ReportType, period_start: date
     ) -> Optional[Report]:
         result = await db.execute(
             select(Report).where(
-                Report.pupil_id == pupil_id,
+                Report.go_getter_id == go_getter_id,
                 Report.report_type == report_type,
                 Report.period_start == period_start,
             )

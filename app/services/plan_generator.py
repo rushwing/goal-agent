@@ -70,7 +70,7 @@ def _build_user_prompt(
     total_weeks = max(1, (total_days + 6) // 7)
 
     prompt = (
-        f"Student: {pupil_name} (Grade {grade})\n"
+        f"Go Getter: {pupil_name} (Grade {grade})\n"
         f"Subject: {target.subject}\n"
         f"Learning goal: {target.title}\n"
         f"Description: {target.description}\n"
@@ -134,13 +134,13 @@ async def generate_plan(
 
     total_weeks = max(1, (((end_date - start_date).days + 1) + 6) // 7)
 
-    # Deactivate any existing active plans for this pupil (single-active-plan invariant)
+    # Deactivate any existing active plans for this go getter (single-active-plan invariant)
     from sqlalchemy import select as _select
 
     existing_active = await db.execute(
         _select(Plan)
         .join(Target, Plan.target_id == Target.id)
-        .where(Target.pupil_id == target.pupil_id, Plan.status == PlanStatus.active)
+        .where(Target.go_getter_id == target.go_getter_id, Plan.status == PlanStatus.active)
     )
     for old_plan in existing_active.scalars().all():
         old_plan.status = PlanStatus.completed
