@@ -70,7 +70,9 @@ def upgrade() -> None:
     fk_pupils_parent = _get_fk_name(conn, "pupils", "parent_id", "parents")
     if fk_pupils_parent:
         op.drop_constraint(fk_pupils_parent, "pupils", type_="foreignkey")
-    op.drop_index("ix_pupils_parent_id", table_name="pupils")
+    # MariaDB may have auto-dropped the backing index when the FK was dropped;
+    # use IF EXISTS so we don't fail on a re-run or when MariaDB already cleaned it up
+    op.execute("DROP INDEX IF EXISTS ix_pupils_parent_id ON pupils")
 
     # ------------------------------------------------------------------
     # 2. Drop old unique constraints (will be recreated with new names)
