@@ -24,6 +24,7 @@
     "generate_daily_report", "generate_weekly_report", "generate_monthly_report", "list_reports",
     "start_goal_group_wizard", "get_wizard_status", "set_wizard_scope",
     "set_wizard_targets", "set_wizard_constraints", "adjust_wizard",
-    "confirm_goal_group", "cancel_goal_group_wizard"
+    "confirm_goal_group", "cancel_goal_group_wizard",
+    "list_track_categories", "list_track_subcategories"
   ]
 }

@@ -34,12 +34,16 @@ async def create_target(
     title: str,
     subject: str,
     description: str,
+    subcategory_id: Optional[int] = None,
     vacation_type: str = "summer",
     vacation_year: int = 2026,
     priority: int = 3,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
-    """Create a learning target for a go getter. Requires best_pal/admin role."""
+    """Create a learning target for a go getter. Requires best_pal/admin role.
+
+    subcategory_id: use list_track_categories to discover valid IDs.
+    """
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
         await require_role(db, caller_id, [Role.admin, Role.best_pal])
@@ -49,6 +53,7 @@ async def create_target(
             title=title,
             subject=subject,
             description=description,
+            subcategory_id=subcategory_id,
             vacation_type=VacationType(vacation_type),
             vacation_year=vacation_year,
             priority=priority,
