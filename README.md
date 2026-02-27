@@ -40,8 +40,9 @@ AI-powered goal and habit tracking agent. Generates personalized study plans usi
 | 3 – Check-in System | ✅ | Streak / XP / badges, praise engine |
 | 4 – Reports | ✅ | Daily / weekly / monthly Markdown reports, GitHub archival |
 | 5 – Telegram & OpenClaw | ✅ | Scheduler jobs, Telegram DMs & group, TypeScript plugin |
-| 6 – Gamification+ | 🔜 | Sibling leaderboard, streak freeze, XP shop |
-| 7 – Frontend | 🔜 | Jinja2 dashboard or React SPA |
+| 6 – GoalGroup Wizard | ✅ | Guided multi-step GoalGroup + plan creation via OpenClaw conversation |
+| 7 – Gamification+ | 🔜 | Sibling leaderboard, streak freeze, XP shop |
+| 8 – Frontend | 🔜 | Jinja2 dashboard or React SPA |
 
 ---
 
@@ -65,7 +66,7 @@ goal-agent/
 │   ├── schemas/                 # Pydantic v2 request/response schemas
 │   ├── crud/                    # Generic CRUDBase + 8 specific modules
 │   ├── api/v1/                  # FastAPI REST routers
-│   ├── mcp/                     # FastMCP server + auth + 26 tools
+│   ├── mcp/                     # FastMCP server + auth + 36 tools (6 groups)
 │   └── services/                # LLM, streak, praise, reports, GitHub, Telegram, scheduler
 ├── alembic/                     # Async-aware migrations
 ├── openclaw-plugin/             # TypeScript OpenClaw plugin (axios)
@@ -202,6 +203,14 @@ All tools require the `X-Telegram-Chat-Id` header for role resolution.
 ### Report tools (`best_pal / admin`; go_getter for own)
 `generate_daily_report` · `generate_weekly_report` · `generate_monthly_report` · `list_reports`
 
+### Wizard tools (`best_pal / admin` role)
+`start_goal_group_wizard` · `get_wizard_status` · `set_wizard_scope`
+`set_wizard_targets` · `set_wizard_constraints` · `adjust_wizard`
+`confirm_goal_group` · `cancel_goal_group_wizard`
+
+### Track tools (`all authenticated roles`)
+`list_track_categories` · `list_track_subcategories`
+
 ---
 
 ## XP & Streak System
@@ -234,7 +243,7 @@ mood_bonus:         1 → 0.8 · 2 → 0.9 · 3 → 1.0 · 4 → 1.1 · 5 → 1.
 | Time | Job |
 |------|-----|
 | 07:30 daily | Send today's task list DM to each active go getter |
-| 21:00 daily | Evening reminder for unchecked tasks + generate daily report |
+| 21:00 daily | Evening reminder for unchecked tasks + generate daily report + post summary to Telegram group |
 | Sunday 20:00 | Generate weekly report + post summary to Telegram group |
 | 1st of month 08:00 | Generate monthly report + post summary to Telegram group |
 
@@ -256,7 +265,38 @@ Configure via environment variable:
 PLUGIN_CONFIG='{"apiBaseUrl":"http://raspberry-pi-ip:8000/api/v1","telegramChatId":"123456789"}'
 ```
 
-Two configs are typical — one with a best pal's chat ID, one with a go getter's — giving each the right role-gated tool set.
+Optional HMAC signing (production):
+
+```json
+PLUGIN_CONFIG='{"apiBaseUrl":"...","telegramChatId":"...","hmacSecret":"your-shared-secret"}'
+```
+
+Two configs are typical — one with a best pal's chat ID (accesses wizard, plan, report, tracks tools), one with a go getter's (accesses check-in tools). The server resolves the role from `X-Telegram-Chat-Id` automatically.
+
+### Available tool groups in the plugin
+
+| Group | File | Tools |
+|-------|------|-------|
+| Admin | `admin.tools.ts` | add/update/remove/list go_getters & best_pals |
+| Plan | `plan.tools.ts` | create/update/delete/list targets & plans |
+| Check-in | `checkin.tools.ts` | today tasks, checkin, skip, progress |
+| Report | `report.tools.ts` | daily / weekly / monthly reports |
+| **Wizard** | `wizard.tools.ts` | guided GoalGroup creation (8 steps) |
+| **Tracks** | `tracks.tools.ts` | list categories & subcategories |
+
+### GoalGroup Wizard conversation flow (BestPal)
+
+```
+list_track_categories          ← discover subcategory IDs
+create_target (subcategory_id) ← add learning goals for go_getter
+start_goal_group_wizard        ← begin guided creation
+set_wizard_scope               ← title + date range (≥ 7 days)
+set_wizard_targets             ← select which targets to include
+set_wizard_constraints         ← daily minutes per target (triggers AI plan gen, ~10–30 s/target)
+get_wizard_status              ← read feasibility_passed + blockers/warnings
+adjust_wizard                  ← fix blockers (re-generates plans)
+confirm_goal_group             ← create GoalGroup + activate plans
+```
 
 ---
 
