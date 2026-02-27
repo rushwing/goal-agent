@@ -11,8 +11,8 @@
 #   ./scripts/db_init.sh --skip-migrate          # skip Alembic step
 #
 # App DB credentials are read from .env:
-#   Preferred  – individual vars: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
-#   Fallback   – parsed from DATABASE_URL (mysql+aiomysql://user:pw@host:port/db)
+#   Preferred  – DATABASE_URL (mysql+aiomysql://user:pw@host:port/db) — always used when present
+#   Fallback   – individual vars: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 #
 # Idempotent: safe to re-run (CREATE IF NOT EXISTS, ALTER USER for password sync).
 
@@ -52,9 +52,10 @@ else
 fi
 
 # ── Resolve DB credentials ────────────────────────────────────────────────────
-# Prefer explicit DB_* vars; fall back to parsing DATABASE_URL.
-if [[ -z "${DB_HOST:-}" ]] && [[ -n "${DATABASE_URL:-}" ]]; then
-  step "Parsing DB credentials from DATABASE_URL…"
+# DATABASE_URL is the canonical DSN used by the app and Alembic; always parse
+# it when present so the script provisions exactly the DB the app will connect
+# to.  DB_* vars are only used as a fallback when DATABASE_URL is absent.
+if [[ -n "${DATABASE_URL:-}" ]]; then
   _rest="${DATABASE_URL#*://}"        # strip scheme (mysql+aiomysql://)
   DB_USER="${_rest%%:*}"
   _rest="${_rest#*:}"
@@ -65,13 +66,17 @@ if [[ -z "${DB_HOST:-}" ]] && [[ -n "${DATABASE_URL:-}" ]]; then
   DB_PORT="${_rest%%/*}"
   DB_NAME="${_rest#*/}"
   DB_NAME="${DB_NAME%%\?*}"           # strip any query params
+elif [[ -n "${DB_HOST:-}" ]]; then
+  : # use DB_* vars sourced from .env as-is
+else
+  die "No DB credentials found. Set DATABASE_URL (or DB_HOST/DB_NAME/DB_USER/DB_PASSWORD) in .env"
 fi
 
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-3306}"
-: "${DB_NAME:?DB_NAME not set. Add DB_NAME (or DATABASE_URL) to .env}"
-: "${DB_USER:?DB_USER not set. Add DB_USER (or DATABASE_URL) to .env}"
-: "${DB_PASSWORD:?DB_PASSWORD not set. Add DB_PASSWORD (or DATABASE_URL) to .env}"
+: "${DB_NAME:?DB_NAME not set. Check DATABASE_URL in .env}"
+: "${DB_USER:?DB_USER not set. Check DATABASE_URL in .env}"
+: "${DB_PASSWORD:?DB_PASSWORD not set. Check DATABASE_URL in .env}"
 
 # ── Verify mysql client is available ─────────────────────────────────────────
 if ! command -v mysql &>/dev/null; then
