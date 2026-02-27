@@ -65,9 +65,11 @@ def upgrade() -> None:
         if fk:
             op.drop_constraint(fk, table, type_="foreignkey")
 
-    # FK from pupils.parent_id → parents.id (named explicitly in migration 002)
-    # Drop FK before index — MariaDB requires this order
-    op.drop_constraint("fk_pupils_parent_id", "pupils", type_="foreignkey")
+    # FK from pupils.parent_id → parents.id
+    # Use helper so we tolerate whatever name MariaDB actually stored
+    fk_pupils_parent = _get_fk_name(conn, "pupils", "parent_id", "parents")
+    if fk_pupils_parent:
+        op.drop_constraint(fk_pupils_parent, "pupils", type_="foreignkey")
     op.drop_index("ix_pupils_parent_id", table_name="pupils")
 
     # ------------------------------------------------------------------
