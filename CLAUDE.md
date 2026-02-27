@@ -92,10 +92,34 @@ alembic/versions/
   005_track_and_group.py  # Track taxonomy, GoalGroup, task status, plan versioning
   006_goal_group_wizard.py # goal_group_wizards table; WizardStatus enum; expires_at TTL
 scripts/
-  deploy.sh              # Full deploy (uv sync + migrate + systemd + cron)
-  provision.sh           # First-time MariaDB setup (run once as root)
-  backup.sh              # Daily DB backup (cron installed by deploy.sh)
+  setup.sh               # Bootstrap project: install uv, sync deps, copy .env.example
+  db_init.sh             # First-time MariaDB DB + user creation, then migrate (run once)
+  migrate.sh             # Run Alembic migrations (wraps `uv run alembic`)
+  dev.sh                 # Start API server with hot-reload (development)
+  test.sh                # Run test suite (in-memory SQLite, no MariaDB needed)
+  lint.sh                # Run ruff check + format
+  deploy.sh              # Full deploy: uv sync + migrate + systemd reload + cron
+  backup.sh              # Dump MariaDB + .env to backups/; auto-prune after 7 days
 ```
+
+## First-time Setup
+
+```bash
+# 1. Bootstrap Python env and copy .env.example → .env
+./scripts/setup.sh --dev          # add --dev for test/lint deps
+
+# 2. Fill in secrets
+$EDITOR .env                      # set DATABASE_URL, DB_*, tokens, keys
+
+# 3. Create MariaDB database + user, then run migrations
+./scripts/db_init.sh              # root with socket auth (no password prompt)
+./scripts/db_init.sh -p <pw>      # or pass MariaDB root password explicitly
+
+# 4. Start the development server
+./scripts/dev.sh
+```
+
+`db_init.sh` reads app credentials from `.env` — either the individual `DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD` vars or by parsing `DATABASE_URL`. Supports `--skip-migrate` to skip the Alembic step. Idempotent: safe to re-run.
 
 ## Wizard Feature (migration 006)
 
