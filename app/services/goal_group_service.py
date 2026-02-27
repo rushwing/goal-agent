@@ -38,8 +38,7 @@ async def assert_change_allowed(group: GoalGroup) -> None:
         remaining = timedelta(days=_CHANGE_COOLDOWN_DAYS) - elapsed
         hours = int(remaining.total_seconds() // 3600)
         raise ValueError(
-            f"GoalGroup was already changed recently. "
-            f"Next change allowed in {hours} hours."
+            f"GoalGroup was already changed recently. Next change allowed in {hours} hours."
         )
 
 
@@ -142,9 +141,7 @@ async def trigger_replan(
         result = await db.execute(
             select(GoalGroup)
             .where(GoalGroup.id == group.id)
-            .options(
-                selectinload(GoalGroup.targets).selectinload(Target.plans)
-            )
+            .options(selectinload(GoalGroup.targets).selectinload(Target.plans))
         )
         group = result.scalar_one()
 
@@ -186,7 +183,7 @@ async def trigger_replan(
                 grade=go_getter.grade,
                 start_date=replan_from,
                 end_date=group.end_date or active_plan_full.end_date,
-                daily_study_minutes=None,   # inherit from original or LLM decides
+                daily_study_minutes=None,  # inherit from original or LLM decides
                 preferred_days=None,
                 extra_instructions=(
                     f"This is a re-plan triggered by a group change: "

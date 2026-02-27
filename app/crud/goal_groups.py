@@ -17,9 +17,7 @@ async def get(db: AsyncSession, group_id: int) -> Optional[GoalGroup]:
     return result.scalar_one_or_none()
 
 
-async def get_active_for_go_getter(
-    db: AsyncSession, go_getter_id: int
-) -> Optional[GoalGroup]:
+async def get_active_for_go_getter(db: AsyncSession, go_getter_id: int) -> Optional[GoalGroup]:
     """Return the single active GoalGroup for a GoGetter, if any."""
     result = await db.execute(
         select(GoalGroup)
@@ -91,13 +89,7 @@ async def acquire_replan_lock(db: AsyncSession, group_id: int) -> bool:
     return result.rowcount == 1
 
 
-async def release_replan_lock(
-    db: AsyncSession, group_id: int, *, failed: bool = False
-) -> None:
+async def release_replan_lock(db: AsyncSession, group_id: int, *, failed: bool = False) -> None:
     status = ReplanStatus.failed if failed else ReplanStatus.idle
-    await db.execute(
-        update(GoalGroup)
-        .where(GoalGroup.id == group_id)
-        .values(replan_status=status)
-    )
+    await db.execute(update(GoalGroup).where(GoalGroup.id == group_id).values(replan_status=status))
     await db.flush()

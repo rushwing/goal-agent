@@ -28,7 +28,5 @@ async def get_subcategories(
 
 
 async def get_subcategory(db: AsyncSession, subcategory_id: int) -> TrackSubcategory | None:
-    result = await db.execute(
-        select(TrackSubcategory).where(TrackSubcategory.id == subcategory_id)
-    )
+    result = await db.execute(select(TrackSubcategory).where(TrackSubcategory.id == subcategory_id))
     return result.scalar_one_or_none()

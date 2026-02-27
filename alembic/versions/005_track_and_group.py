@@ -33,54 +33,54 @@ depends_on: Union[str, Sequence[str], None] = None
 # ---------------------------------------------------------------------------
 
 CATEGORIES = [
-    (1, "Study",       "Academic subjects and cognitive skills", "📚", "#4F8EF7"),
-    (2, "Fitness",     "Physical health and exercise",           "💪", "#F76F4F"),
-    (3, "Habit",       "Daily routines and lifestyle habits",    "🔄", "#4FBF8E"),
-    (4, "Mindset",     "Mental wellness and self-reflection",    "🧠", "#A06FF7"),
-    (5, "Creative",    "Arts, music, and creative expression",   "🎨", "#F7C94F"),
-    (6, "Life Skills", "Practical real-world competencies",      "🛠️", "#6FA8F7"),
+    (1, "Study", "Academic subjects and cognitive skills", "📚", "#4F8EF7"),
+    (2, "Fitness", "Physical health and exercise", "💪", "#F76F4F"),
+    (3, "Habit", "Daily routines and lifestyle habits", "🔄", "#4FBF8E"),
+    (4, "Mindset", "Mental wellness and self-reflection", "🧠", "#A06FF7"),
+    (5, "Creative", "Arts, music, and creative expression", "🎨", "#F7C94F"),
+    (6, "Life Skills", "Practical real-world competencies", "🛠️", "#6FA8F7"),
 ]
 
 SUBCATEGORIES = [
     # Study
-    (1,  1, "Math",            1),
-    (2,  1, "Chinese",         2),
-    (3,  1, "English",         3),
-    (4,  1, "Science",         4),
-    (5,  1, "History",         5),
-    (6,  1, "Programming",     6),
-    (7,  1, "Reading",         7),
-    (8,  1, "Other",           99),
+    (1, 1, "Math", 1),
+    (2, 1, "Chinese", 2),
+    (3, 1, "English", 3),
+    (4, 1, "Science", 4),
+    (5, 1, "History", 5),
+    (6, 1, "Programming", 6),
+    (7, 1, "Reading", 7),
+    (8, 1, "Other", 99),
     # Fitness
-    (9,  2, "Cardio",          1),
-    (10, 2, "Strength",        2),
-    (11, 2, "Flexibility",     3),
-    (12, 2, "Swimming",        4),
-    (13, 2, "Sports",          5),
-    (14, 2, "Other",           99),
+    (9, 2, "Cardio", 1),
+    (10, 2, "Strength", 2),
+    (11, 2, "Flexibility", 3),
+    (12, 2, "Swimming", 4),
+    (13, 2, "Sports", 5),
+    (14, 2, "Other", 99),
     # Habit
-    (15, 3, "Sleep",           1),
-    (16, 3, "Diet",            2),
-    (17, 3, "Hydration",       3),
-    (18, 3, "Screen Time",     4),
+    (15, 3, "Sleep", 1),
+    (16, 3, "Diet", 2),
+    (17, 3, "Hydration", 3),
+    (18, 3, "Screen Time", 4),
     (19, 3, "Morning Routine", 5),
-    (20, 3, "Other",           99),
+    (20, 3, "Other", 99),
     # Mindset
-    (21, 4, "Journaling",      1),
-    (22, 4, "Meditation",      2),
-    (23, 4, "Gratitude",       3),
-    (24, 4, "Other",           99),
+    (21, 4, "Journaling", 1),
+    (22, 4, "Meditation", 2),
+    (23, 4, "Gratitude", 3),
+    (24, 4, "Other", 99),
     # Creative
-    (25, 5, "Drawing",         1),
-    (26, 5, "Music",           2),
-    (27, 5, "Creative Writing",3),
-    (28, 5, "Photography",     4),
-    (29, 5, "Other",           99),
+    (25, 5, "Drawing", 1),
+    (26, 5, "Music", 2),
+    (27, 5, "Creative Writing", 3),
+    (28, 5, "Photography", 4),
+    (29, 5, "Other", 99),
     # Life Skills
-    (30, 6, "Finance",         1),
-    (31, 6, "Cooking",         2),
-    (32, 6, "Social Skills",   3),
-    (33, 6, "Other",           99),
+    (30, 6, "Finance", 1),
+    (31, 6, "Cooking", 2),
+    (32, 6, "Social Skills", 3),
+    (33, 6, "Other", 99),
 ]
 
 
@@ -182,20 +182,16 @@ def upgrade() -> None:
     op.create_foreign_key(
         "fk_targets_subcategory", "targets", "track_subcategories", ["subcategory_id"], ["id"]
     )
-    op.create_foreign_key(
-        "fk_targets_group", "targets", "goal_groups", ["group_id"], ["id"]
-    )
+    op.create_foreign_key("fk_targets_group", "targets", "goal_groups", ["group_id"], ["id"])
 
     # ── alter plans ────────────────────────────────────────────────────────
-    op.add_column("plans", sa.Column("version", sa.SmallInteger(), nullable=False, server_default="1"))
+    op.add_column(
+        "plans", sa.Column("version", sa.SmallInteger(), nullable=False, server_default="1")
+    )
     op.add_column("plans", sa.Column("superseded_by_id", sa.Integer(), nullable=True))
     op.add_column("plans", sa.Column("group_id", sa.Integer(), nullable=True))
-    op.create_foreign_key(
-        "fk_plans_superseded_by", "plans", "plans", ["superseded_by_id"], ["id"]
-    )
-    op.create_foreign_key(
-        "fk_plans_group", "plans", "goal_groups", ["group_id"], ["id"]
-    )
+    op.create_foreign_key("fk_plans_superseded_by", "plans", "plans", ["superseded_by_id"], ["id"])
+    op.create_foreign_key("fk_plans_group", "plans", "goal_groups", ["group_id"], ["id"])
 
     # ── alter tasks ────────────────────────────────────────────────────────
     op.add_column(
@@ -221,7 +217,14 @@ def upgrade() -> None:
     op.bulk_insert(
         track_categories,
         [
-            {"id": c[0], "name": c[1], "description": c[2], "icon": c[3], "color": c[4], "sort_order": i}
+            {
+                "id": c[0],
+                "name": c[1],
+                "description": c[2],
+                "icon": c[3],
+                "color": c[4],
+                "sort_order": i,
+            }
             for i, c in enumerate(CATEGORIES, start=1)
         ],
     )

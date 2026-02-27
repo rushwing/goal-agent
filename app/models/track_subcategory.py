@@ -17,11 +17,15 @@ class TrackSubcategory(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    category_id: Mapped[int] = mapped_column(Integer, ForeignKey("track_categories.id"), nullable=False)
+    category_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("track_categories.id"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[str | None] = mapped_column(String(200), nullable=True)
     sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    category: Mapped["TrackCategory"] = relationship("TrackCategory", back_populates="subcategories")
+    category: Mapped["TrackCategory"] = relationship(
+        "TrackCategory", back_populates="subcategories"
+    )
     targets: Mapped[list["Target"]] = relationship("Target", back_populates="subcategory")
