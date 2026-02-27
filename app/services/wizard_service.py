@@ -1,0 +1,417 @@
+"""Wizard service: orchestration layer for the guided GoalGroup creation wizard."""
+
+from __future__ import annotations
+
+import logging
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Optional
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.crud import wizards as crud_wizard
+from app.models.goal_group_wizard import GoalGroupWizard, WizardStatus
+from app.models.plan import Plan, PlanStatus
+
+if TYPE_CHECKING:
+    from app.models.goal_group import GoalGroup
+
+logger = logging.getLogger(__name__)
+
+WIZARD_TTL_HOURS = 24
+
+_TERMINAL = frozenset({WizardStatus.confirmed, WizardStatus.cancelled, WizardStatus.failed})
+
+
+def _now_utc() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _default_expires_at() -> datetime:
+    return _now_utc() + timedelta(hours=WIZARD_TTL_HOURS)
+
+
+# ---------------------------------------------------------------------------
+# Public service functions
+# ---------------------------------------------------------------------------
+
+
+async def create_wizard(db: AsyncSession, *, go_getter_id: int) -> GoalGroupWizard:
+    """Create a new wizard in collecting_scope state.
+
+    Raises ValueError if the go_getter already has an active (non-terminal) wizard.
+    """
+    existing = await crud_wizard.get_active_for_go_getter(db, go_getter_id)
+    if existing:
+        raise ValueError(
+            f"An active wizard already exists for this go_getter (id={existing.id}). "
+            "Complete or cancel it before starting a new one."
+        )
+    wizard = await crud_wizard.create(
+        db, go_getter_id=go_getter_id, expires_at=_default_expires_at()
+    )
+    return wizard
+
+
+async def set_scope(
+    db: AsyncSession,
+    wizard: GoalGroupWizard,
+    *,
+    title: str,
+    description: Optional[str],
+    start_date,
+    end_date,
+) -> GoalGroupWizard:
+    """Save scope fields, transition to collecting_targets.
+
+    Raises ValueError if the date range is less than 7 days.
+    """
+    _assert_not_terminal(wizard)
+    span = (end_date - start_date).days
+    if span < 7:
+        raise ValueError(f"end_date must be at least 7 days after start_date (got {span} days).")
+    wizard = await crud_wizard.update_wizard(
+        db,
+        wizard,
+        group_title=title,
+        group_description=description,
+        start_date=start_date,
+        end_date=end_date,
+        status=WizardStatus.collecting_targets,
+    )
+    return wizard
+
+
+async def set_targets(
+    db: AsyncSession,
+    wizard: GoalGroupWizard,
+    *,
+    target_specs: list[dict],
+) -> GoalGroupWizard:
+    """Save target specs, transition to collecting_constraints.
+
+    Raises ValueError if any target_id doesn't belong to the wizard's go_getter.
+    """
+    _assert_not_terminal(wizard)
+    from app.models.target import Target
+
+    normalized: list[dict] = []
+    for spec in target_specs:
+        target_id = spec.get("target_id")
+        result = await db.execute(select(Target).where(Target.id == target_id))
+        target = result.scalar_one_or_none()
+        if target is None:
+            raise ValueError(f"Target {target_id} not found.")
+        if target.go_getter_id != wizard.go_getter_id:
+            raise ValueError(
+                f"Target {target_id} does not belong to go_getter {wizard.go_getter_id}."
+            )
+        # P1: normalize subcategory_id from DB so feasibility checks use the
+        # authoritative value, not whatever the client sent.
+        normalized.append(
+            {
+                "target_id": target_id,
+                "subcategory_id": target.subcategory_id,
+                "priority": spec.get("priority", 3),
+            }
+        )
+
+    wizard = await crud_wizard.update_wizard(
+        db,
+        wizard,
+        target_specs=normalized,
+        status=WizardStatus.collecting_constraints,
+    )
+    return wizard
+
+
+async def set_constraints(
+    db: AsyncSession,
+    wizard: GoalGroupWizard,
+    *,
+    constraints: dict,
+) -> GoalGroupWizard:
+    """Save constraints, then trigger plan generation + feasibility check."""
+    _assert_not_terminal(wizard)
+    # Store constraints with string keys (JSON serialisation)
+    str_constraints = {str(k): v for k, v in constraints.items()}
+    wizard = await crud_wizard.update_wizard(
+        db,
+        wizard,
+        constraints=str_constraints,
+        status=WizardStatus.generating_plans,
+    )
+    await _generate_and_check(db, wizard)
+    return wizard
+
+
+async def run_feasibility(db: AsyncSession, wizard: GoalGroupWizard) -> GoalGroupWizard:
+    """Run feasibility check on the current wizard state."""
+    _assert_not_terminal(wizard)
+    from app.services.feasibility_service import check_feasibility, enrich_with_llm
+
+    risks = await check_feasibility(db, wizard)
+    risks = await enrich_with_llm(risks)
+
+    passed = not any(r.is_blocker for r in risks)
+    wizard = await crud_wizard.update_wizard(
+        db,
+        wizard,
+        feasibility_risks=[r.to_dict() for r in risks],
+        feasibility_passed=1 if passed else 0,
+        status=WizardStatus.feasibility_check,
+    )
+    return wizard
+
+
+async def adjust(
+    db: AsyncSession,
+    wizard: GoalGroupWizard,
+    *,
+    patch: dict,
+) -> GoalGroupWizard:
+    """Apply partial updates to target_specs / constraints and re-generate + re-check."""
+    _assert_not_terminal(wizard)
+
+    updates: dict = {"status": WizardStatus.adjusting}
+
+    if "target_specs" in patch and patch["target_specs"] is not None:
+        updates["target_specs"] = patch["target_specs"]
+
+    if "constraints" in patch and patch["constraints"] is not None:
+        new_constraints = {str(k): v for k, v in patch["constraints"].items()}
+        updates["constraints"] = new_constraints
+
+    wizard = await crud_wizard.update_wizard(db, wizard, **updates)
+
+    # Cancel any previously generated draft plans
+    await _cancel_draft_plans(db, wizard)
+    wizard = await crud_wizard.update_wizard(
+        db, wizard, draft_plan_ids=[], status=WizardStatus.generating_plans
+    )
+
+    await _generate_and_check(db, wizard)
+    return wizard
+
+
+async def confirm(db: AsyncSession, wizard: GoalGroupWizard) -> GoalGroup:
+    """Atomically create the GoalGroup and activate all draft plans.
+
+    Raises ValueError if the wizard has unresolved blocker risks.
+    """
+    _assert_not_terminal(wizard)
+    if wizard.feasibility_passed is None:
+        raise ValueError("Feasibility check has not been run yet.")
+    if wizard.feasibility_passed == 0:
+        raise ValueError(
+            "Cannot confirm: wizard has blocking feasibility issues. "
+            "Fix the issues or call adjust first."
+        )
+    if not wizard.draft_plan_ids:
+        raise ValueError("No draft plans found. Run constraints step first.")
+    # P1: reject confirm when generation_errors exist — some targets have no plan
+    if wizard.generation_errors:
+        raise ValueError(
+            "Cannot confirm: plan generation failed for one or more targets. "
+            "Call adjust to retry or remove the failing targets."
+        )
+
+    from app.crud.goal_groups import create as crud_create_group, get_active_for_go_getter
+    from app.models.goal_group import GoalGroupStatus
+    from app.models.target import Target
+
+    # Enforce one-active-group invariant (service layer)
+    existing_group = await get_active_for_go_getter(db, wizard.go_getter_id)
+    if existing_group:
+        raise ValueError(
+            f"GoGetter already has an active GoalGroup (id={existing_group.id}). "
+            "Complete or archive it before confirming the wizard."
+        )
+
+    # Create the GoalGroup
+    group = await crud_create_group(
+        db,
+        go_getter_id=wizard.go_getter_id,
+        title=wizard.group_title or "My Goal Group",
+        description=wizard.group_description,
+        start_date=wizard.start_date,
+        end_date=wizard.end_date,
+    )
+
+    # Activate all draft plans and link them + their targets to the group
+    target_ids_linked: set[int] = set()
+    for plan_id in wizard.draft_plan_ids:
+        result = await db.execute(select(Plan).where(Plan.id == plan_id))
+        plan = result.scalar_one_or_none()
+        if plan is None:
+            logger.warning("Wizard %d: draft plan %d not found during confirm", wizard.id, plan_id)
+            continue
+        if plan.status == PlanStatus.draft:
+            # P0: deactivate any live active plan for this target at confirm time,
+            # not during draft generation, so existing plans are never mutated
+            # before the user confirms the wizard.
+            existing_active = await db.execute(
+                select(Plan).where(
+                    Plan.target_id == plan.target_id,
+                    Plan.status == PlanStatus.active,
+                )
+            )
+            for old_plan in existing_active.scalars().all():
+                old_plan.status = PlanStatus.completed
+                db.add(old_plan)
+
+            plan.status = PlanStatus.active
+            plan.group_id = group.id
+            db.add(plan)
+
+            if plan.target_id not in target_ids_linked:
+                t_result = await db.execute(select(Target).where(Target.id == plan.target_id))
+                target = t_result.scalar_one_or_none()
+                if target:
+                    target.group_id = group.id
+                    db.add(target)
+                target_ids_linked.add(plan.target_id)
+
+    await db.flush()
+
+    wizard = await crud_wizard.update_wizard(
+        db,
+        wizard,
+        goal_group_id=group.id,
+        status=WizardStatus.confirmed,
+    )
+    logger.info(
+        "Wizard %d confirmed: created GoalGroup %d with plans %s",
+        wizard.id,
+        group.id,
+        wizard.draft_plan_ids,
+    )
+    return group
+
+
+async def cancel_wizard(db: AsyncSession, wizard: GoalGroupWizard) -> None:
+    """Cancel the wizard and all draft plans generated within it."""
+    if wizard.status in _TERMINAL:
+        return
+    await _cancel_draft_plans(db, wizard)
+    await crud_wizard.update_wizard(db, wizard, status=WizardStatus.cancelled)
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _assert_not_terminal(wizard: GoalGroupWizard) -> None:
+    if wizard.status in _TERMINAL:
+        raise ValueError(
+            f"Wizard {wizard.id} is in terminal state '{wizard.status.value}' and cannot be modified."
+        )
+
+
+async def _cancel_draft_plans(db: AsyncSession, wizard: GoalGroupWizard) -> None:
+    """Cancel all draft plans tracked by wizard.draft_plan_ids."""
+    if not wizard.draft_plan_ids:
+        return
+    for plan_id in wizard.draft_plan_ids:
+        result = await db.execute(select(Plan).where(Plan.id == plan_id))
+        plan = result.scalar_one_or_none()
+        if plan and plan.status == PlanStatus.draft:
+            plan.status = PlanStatus.cancelled
+            db.add(plan)
+    await db.flush()
+
+
+async def _generate_and_check(db: AsyncSession, wizard: GoalGroupWizard) -> None:
+    """Generate draft plans for all target_specs, then run feasibility.
+
+    Updates wizard in-place via crud_wizard.update_wizard.
+    """
+    from app.services import plan_generator
+    from app.services.feasibility_service import check_feasibility, enrich_with_llm
+    from app.models.target import Target
+    from app.models.go_getter import GoGetter
+
+    # Load the go_getter for pupil_name and grade
+    gg_result = await db.execute(select(GoGetter).where(GoGetter.id == wizard.go_getter_id))
+    go_getter = gg_result.scalar_one_or_none()
+    if go_getter is None:
+        await crud_wizard.update_wizard(
+            db,
+            wizard,
+            generation_errors=[{"error": "GoGetter not found"}],
+            status=WizardStatus.failed,
+        )
+        return
+
+    target_specs = wizard.target_specs or []
+    draft_plan_ids: list[int] = []
+    errors: list[dict] = []
+
+    wizard = await crud_wizard.update_wizard(
+        db, wizard, status=WizardStatus.generating_plans, generation_errors=None
+    )
+
+    for spec in target_specs:
+        target_id = spec.get("target_id")
+        subcategory_id = spec.get("subcategory_id")
+
+        t_result = await db.execute(select(Target).where(Target.id == target_id))
+        target = t_result.scalar_one_or_none()
+        if target is None:
+            errors.append({"target_id": target_id, "error": "Target not found"})
+            continue
+
+        # Resolve constraints
+        constraint = {}
+        if wizard.constraints and subcategory_id is not None:
+            constraint = (
+                wizard.constraints.get(str(subcategory_id))
+                or wizard.constraints.get(subcategory_id)
+                or {}
+            )
+        daily_minutes = constraint.get("daily_minutes") if constraint else None
+        preferred_days = constraint.get("preferred_days") if constraint else None
+
+        try:
+            new_plan = await plan_generator.generate_plan(
+                db=db,
+                target=target,
+                pupil_name=go_getter.name,
+                grade=go_getter.grade,
+                start_date=wizard.start_date,
+                end_date=wizard.end_date,
+                daily_study_minutes=daily_minutes,
+                preferred_days=preferred_days,
+                initial_status=PlanStatus.draft,
+                deactivate_existing=False,  # P0: preserve live plans until confirm
+            )
+            draft_plan_ids.append(new_plan.id)
+        except Exception as exc:
+            logger.exception(
+                "Wizard %d: plan generation failed for target %d: %s",
+                wizard.id,
+                target_id,
+                exc,
+            )
+            errors.append({"target_id": target_id, "error": str(exc)})
+
+    # Persist draft_plan_ids regardless of errors
+    wizard = await crud_wizard.update_wizard(
+        db,
+        wizard,
+        draft_plan_ids=draft_plan_ids,
+        generation_errors=errors if errors else None,
+    )
+
+    # Run feasibility (always, even if some plans failed)
+    risks = await check_feasibility(db, wizard)
+    risks = await enrich_with_llm(risks)
+    passed = not any(r.is_blocker for r in risks)
+    wizard = await crud_wizard.update_wizard(
+        db,
+        wizard,
+        feasibility_risks=[r.to_dict() for r in risks],
+        feasibility_passed=1 if passed else 0,
+        status=WizardStatus.feasibility_check,
+    )

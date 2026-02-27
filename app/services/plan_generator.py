@@ -98,9 +98,13 @@ async def generate_plan(
     preferred_days: list[int] | None = None,
     extra_instructions: str | None = None,
     initial_status: PlanStatus = PlanStatus.active,
+    deactivate_existing: bool = True,
 ) -> Plan:
     """
     Call Kimi to generate a structured plan, persist to DB, return Plan object.
+
+    deactivate_existing: when False (wizard draft flow), skip marking existing active
+    plans as completed so live plans are not mutated before the wizard is confirmed.
     """
     user_prompt = _build_user_prompt(
         target,
@@ -142,14 +146,17 @@ async def generate_plan(
     # Deactivate any existing active plan for this specific target.
     # One active plan per target — not per go_getter — to allow parallel tracks
     # (e.g. study + fitness running concurrently).
+    # Skipped when deactivate_existing=False (wizard draft flow) so that live plans
+    # are not mutated until the wizard is confirmed.
     from sqlalchemy import select as _select
 
-    existing_active = await db.execute(
-        _select(Plan).where(Plan.target_id == target.id, Plan.status == PlanStatus.active)
-    )
-    for old_plan in existing_active.scalars().all():
-        old_plan.status = PlanStatus.completed
-    await db.flush()
+    if deactivate_existing:
+        existing_active = await db.execute(
+            _select(Plan).where(Plan.target_id == target.id, Plan.status == PlanStatus.active)
+        )
+        for old_plan in existing_active.scalars().all():
+            old_plan.status = PlanStatus.completed
+        await db.flush()
 
     # Create Plan record
     plan = Plan(

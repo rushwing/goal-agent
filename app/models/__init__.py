@@ -24,6 +24,7 @@ from app.models.notification import (
     NotificationType,
     NotificationStatus,
 )
+from app.models.goal_group_wizard import GoalGroupWizard, WizardStatus
 
 __all__ = [
     "Base",
@@ -56,4 +57,6 @@ __all__ = [
     "NotificationChannel",
     "NotificationType",
     "NotificationStatus",
+    "GoalGroupWizard",
+    "WizardStatus",
 ]

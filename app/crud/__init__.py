@@ -15,6 +15,13 @@ from app.crud.tasks import crud_task
 from app.crud.check_ins import crud_check_in
 from app.crud.reports import crud_report
 from app.crud.achievements import crud_achievement
+from app.crud.wizards import (
+    create as create_wizard,
+    get as get_wizard,
+    get_active_for_go_getter as get_active_wizard_for_go_getter,
+    update_wizard,
+    expire_stale as expire_stale_wizards,
+)
 
 __all__ = [
     "crud_go_getter",
@@ -34,4 +41,9 @@ __all__ = [
     "crud_check_in",
     "crud_report",
     "crud_achievement",
+    "create_wizard",
+    "get_wizard",
+    "get_active_wizard_for_go_getter",
+    "update_wizard",
+    "expire_stale_wizards",
 ]
