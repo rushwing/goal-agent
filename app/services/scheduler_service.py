@@ -61,10 +61,17 @@ async def _send_evening_reminders():
                     go_getter.telegram_chat_id, "\n".join(lines)
                 )
 
-            # Generate daily report
+            # Generate daily report and post summary to group
             try:
-                await report_service.generate_daily_report(db, go_getter, today)
+                report = await report_service.generate_daily_report(db, go_getter, today)
                 await db.commit()
+                summary = (
+                    f"*Daily Report – {go_getter.display_name}*\n\n"
+                    f"Tasks: {report.tasks_completed}/{report.tasks_total} completed\n"
+                    f"XP earned: {report.xp_earned}\n\n"
+                    f"Full report committed to GitHub ✅"
+                )
+                await telegram_service.send_to_group(summary)
             except Exception as exc:
                 logger.error("Daily report generation failed for %s: %s", go_getter.name, exc)
                 await db.rollback()
