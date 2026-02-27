@@ -3,7 +3,10 @@
 #
 # Usage:
 #   ./scripts/backup.sh                    # creates timestamped backup in ./backups/
-#   ./scripts/backup.sh /path/to/custom     # backup to custom directory
+#   ./scripts/backup.sh /path/to/custom   # backup to custom directory
+#
+# Required env vars (must be set in .env):
+#   DB_HOST, DB_NAME, DB_USER, DB_PASSWORD
 #
 # Output:
 #   backups/goal-agent-YYYYMMDD-HHMMSS.sql.gz
@@ -23,10 +26,11 @@ if [[ -f ".env" ]]; then
     set +a
 fi
 
-DB_USER="${DB_USER:-planner}"
-DB_PASS="${DB_PASSWORD:-plannerpass}"
-DB_NAME="${DB_NAME:-vocation_planner}"
-DB_HOST="${DB_HOST:-localhost}"
+# ── Validate required env vars ────────────────────────────────────────────────
+: "${DB_HOST:?DB_HOST is required}"
+: "${DB_NAME:?DB_NAME is required}"
+: "${DB_USER:?DB_USER is required}"
+: "${DB_PASSWORD:?DB_PASSWORD is required}"
 
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_FILE="${BACKUP_DIR}/goal-agent-${TIMESTAMP}.sql.gz"
@@ -41,14 +45,17 @@ die()  { echo -e "${RED}✗${NC}  $*" >&2; exit 1; }
 mkdir -p "$BACKUP_DIR"
 
 # ── Backup database ────────────────────────────────────────────────────────
+# Use MYSQL_PWD env var to avoid password appearing in process list
 step "Backing up database $DB_NAME..."
-if mysqldump -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" | gzip > "$BACKUP_FILE"; then
+export MYSQL_PWD="$DB_PASSWORD"
+if mysqldump -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"; then
     step "Database backed up to $BACKUP_FILE"
 else
     die "Database backup failed"
 fi
+unset MYSQL_PWD
 
-# ── Backup .env (exclude secrets in production) ─────────────────────────────
+# ── Backup .env (full file, includes secrets) ───────────────────────────────
 ENV_BACKUP="${BACKUP_DIR}/env-${TIMESTAMP}.tar.gz"
 if [[ -f ".env" ]]; then
     tar -czf "$ENV_BACKUP" .env 2>/dev/null || true

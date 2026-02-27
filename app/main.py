@@ -127,7 +127,8 @@ async def health_ready():
             await conn.execute(text("SELECT 1"))
         return {"status": "ready", "database": "ok"}
     except Exception as e:
+        logger.error("Health ready check failed: %s", e)
         return JSONResponse(
-            {"status": "not_ready", "database": "error", "detail": str(e)},
+            {"status": "not_ready", "database": "error"},
             status_code=503
         )
