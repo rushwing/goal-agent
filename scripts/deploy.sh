@@ -85,7 +85,9 @@ fi
 # ── 7. Setup cron jobs ──────────────────────────────────────────────────────
 step "Setting up cron jobs…"
 
-BACKUP_CRON="0 3 * * * cd $ROOT && $HOME/.local/bin/uv run $ROOT/scripts/backup.sh >> $ROOT/logs/backup.log 2>&1"
+# Detect uv binary (supports system-wide or user-local installation)
+UV_BIN=$(command -v uv 2>/dev/null || echo "$HOME/.local/bin/uv")
+BACKUP_CRON="0 3 * * * cd $ROOT && $UV_BIN run $ROOT/scripts/backup.sh >> $ROOT/logs/backup.log 2>&1"
 CRON_MARKER="# goal-agent-backup"
 
 # Create logs directory
