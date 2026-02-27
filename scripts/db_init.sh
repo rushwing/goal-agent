@@ -84,9 +84,19 @@ if ! command -v mysql &>/dev/null; then
 fi
 
 # ── Prepare root connection ───────────────────────────────────────────────────
-MYSQL_OPTS=(-h "$DB_HOST" -P "$DB_PORT" -u root)
+# Debian/Raspberry Pi OS: the MariaDB root account uses unix_socket auth by
+# default; TCP connections (forced by -h hostname) are always rejected unless a
+# password is set.  When no root password is supplied and the target host is
+# localhost we therefore use `sudo mysql` (socket auth) instead.
 if [[ -n "$MYSQL_ROOT_PASSWORD" ]]; then
+  MYSQL_CMD=(mysql -h "$DB_HOST" -P "$DB_PORT" -u root)
   export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+elif [[ "$DB_HOST" == "localhost" || "$DB_HOST" == "127.0.0.1" ]]; then
+  MYSQL_CMD=(sudo mysql)
+  warn "No root password supplied — using 'sudo mysql' (unix_socket auth)."
+  warn "You may be prompted for your sudo password."
+else
+  MYSQL_CMD=(mysql -h "$DB_HOST" -P "$DB_PORT" -u root)
 fi
 
 echo ""
@@ -98,7 +108,7 @@ echo ""
 
 # ── Create database + user ────────────────────────────────────────────────────
 step "Creating database and user…"
-mysql "${MYSQL_OPTS[@]}" <<SQL
+"${MYSQL_CMD[@]}" <<SQL
 -- Database
 CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`
   CHARACTER SET utf8mb4
