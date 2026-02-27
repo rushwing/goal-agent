@@ -95,6 +95,7 @@ async def set_targets(
     _assert_not_terminal(wizard)
     from app.models.target import Target
 
+    normalized: list[dict] = []
     for spec in target_specs:
         target_id = spec.get("target_id")
         result = await db.execute(select(Target).where(Target.id == target_id))
@@ -105,11 +106,20 @@ async def set_targets(
             raise ValueError(
                 f"Target {target_id} does not belong to go_getter {wizard.go_getter_id}."
             )
+        # P1: normalize subcategory_id from DB so feasibility checks use the
+        # authoritative value, not whatever the client sent.
+        normalized.append(
+            {
+                "target_id": target_id,
+                "subcategory_id": target.subcategory_id,
+                "priority": spec.get("priority", 3),
+            }
+        )
 
     wizard = await crud_wizard.update_wizard(
         db,
         wizard,
-        target_specs=target_specs,
+        target_specs=normalized,
         status=WizardStatus.collecting_constraints,
     )
     return wizard
@@ -199,6 +209,12 @@ async def confirm(db: AsyncSession, wizard: GoalGroupWizard) -> GoalGroup:
         )
     if not wizard.draft_plan_ids:
         raise ValueError("No draft plans found. Run constraints step first.")
+    # P1: reject confirm when generation_errors exist — some targets have no plan
+    if wizard.generation_errors:
+        raise ValueError(
+            "Cannot confirm: plan generation failed for one or more targets. "
+            "Call adjust to retry or remove the failing targets."
+        )
 
     from app.crud.goal_groups import create as crud_create_group, get_active_for_go_getter
     from app.models.goal_group import GoalGroupStatus
@@ -231,6 +247,19 @@ async def confirm(db: AsyncSession, wizard: GoalGroupWizard) -> GoalGroup:
             logger.warning("Wizard %d: draft plan %d not found during confirm", wizard.id, plan_id)
             continue
         if plan.status == PlanStatus.draft:
+            # P0: deactivate any live active plan for this target at confirm time,
+            # not during draft generation, so existing plans are never mutated
+            # before the user confirms the wizard.
+            existing_active = await db.execute(
+                select(Plan).where(
+                    Plan.target_id == plan.target_id,
+                    Plan.status == PlanStatus.active,
+                )
+            )
+            for old_plan in existing_active.scalars().all():
+                old_plan.status = PlanStatus.completed
+                db.add(old_plan)
+
             plan.status = PlanStatus.active
             plan.group_id = group.id
             db.add(plan)
@@ -355,6 +384,7 @@ async def _generate_and_check(db: AsyncSession, wizard: GoalGroupWizard) -> None
                 daily_study_minutes=daily_minutes,
                 preferred_days=preferred_days,
                 initial_status=PlanStatus.draft,
+                deactivate_existing=False,  # P0: preserve live plans until confirm
             )
             draft_plan_ids.append(new_plan.id)
         except Exception as exc:

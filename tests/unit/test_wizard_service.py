@@ -331,3 +331,185 @@ async def test_confirm_raises_when_feasibility_failed(db, wizard):
     await update_wizard(db, wizard, feasibility_passed=0)
     with pytest.raises(ValueError, match="blocking feasibility issues"):
         await wizard_service.confirm(db, wizard)
+
+
+# ---------------------------------------------------------------------------
+# P0: draft generation must not deactivate live plans
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_draft_generation_does_not_deactivate_existing_active_plan(
+    db, wizard, target, go_getter
+):
+    """Entering /constraints must leave any pre-existing active plan untouched."""
+    from app.models.plan import Plan, PlanStatus
+
+    today = date.today()
+
+    # Create an existing active plan for the target
+    live_plan = Plan(
+        target_id=target.id,
+        title="Live Plan",
+        overview="",
+        start_date=today,
+        end_date=today + timedelta(days=30),
+        total_weeks=4,
+        status=PlanStatus.active,
+    )
+    db.add(live_plan)
+    await db.flush()
+
+    await wizard_service.set_scope(
+        db,
+        wizard,
+        title="T",
+        description=None,
+        start_date=today,
+        end_date=today + timedelta(days=30),
+    )
+    await wizard_service.set_targets(
+        db,
+        wizard,
+        target_specs=[
+            {"target_id": target.id, "subcategory_id": target.subcategory_id, "priority": 3}
+        ],
+    )
+
+    fake_plan_data = {"title": "Draft Plan", "overview": "", "weeks": []}
+    with (
+        patch(
+            "app.services.plan_generator.llm_service.chat_complete_long",
+            new_callable=AsyncMock,
+            return_value=(__import__("json").dumps(fake_plan_data), 10, 20),
+        ),
+        patch(
+            "app.services.llm_service.chat_complete",
+            new_callable=AsyncMock,
+            return_value=(__import__("json").dumps([""]), 5, 10),
+        ),
+    ):
+        await wizard_service.set_constraints(
+            db,
+            wizard,
+            constraints={1: {"daily_minutes": 45, "preferred_days": [0, 1, 2, 3, 4]}},
+        )
+
+    await db.refresh(live_plan)
+    assert live_plan.status == PlanStatus.active, (
+        "Existing active plan must not be completed during draft generation"
+    )
+
+
+@pytest.mark.asyncio
+async def test_confirm_deactivates_existing_active_plan(db, wizard, target, go_getter):
+    """confirm() must complete the pre-existing active plan when activating the draft."""
+    from app.models.plan import Plan, PlanStatus
+
+    today = date.today()
+
+    live_plan = Plan(
+        target_id=target.id,
+        title="Live Plan",
+        overview="",
+        start_date=today,
+        end_date=today + timedelta(days=30),
+        total_weeks=4,
+        status=PlanStatus.active,
+    )
+    db.add(live_plan)
+    await db.flush()
+
+    await wizard_service.set_scope(
+        db,
+        wizard,
+        title="T",
+        description=None,
+        start_date=today,
+        end_date=today + timedelta(days=30),
+    )
+    await wizard_service.set_targets(
+        db,
+        wizard,
+        target_specs=[
+            {"target_id": target.id, "subcategory_id": target.subcategory_id, "priority": 3}
+        ],
+    )
+
+    fake_plan_data = {"title": "Draft Plan", "overview": "", "weeks": []}
+    with (
+        patch(
+            "app.services.plan_generator.llm_service.chat_complete_long",
+            new_callable=AsyncMock,
+            return_value=(__import__("json").dumps(fake_plan_data), 10, 20),
+        ),
+        patch(
+            "app.services.llm_service.chat_complete",
+            new_callable=AsyncMock,
+            return_value=(__import__("json").dumps([""]), 5, 10),
+        ),
+    ):
+        await wizard_service.set_constraints(
+            db,
+            wizard,
+            constraints={1: {"daily_minutes": 45, "preferred_days": [0, 1, 2, 3, 4]}},
+        )
+
+    assert wizard.feasibility_passed == 1
+    await wizard_service.confirm(db, wizard)
+
+    await db.refresh(live_plan)
+    assert live_plan.status == PlanStatus.completed, (
+        "Pre-existing active plan must be completed when the draft is activated on confirm"
+    )
+
+
+# ---------------------------------------------------------------------------
+# P1: confirm must be blocked when generation_errors is non-empty
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_confirm_raises_when_generation_errors(db, wizard):
+    from app.crud.wizards import update_wizard
+
+    await update_wizard(
+        db,
+        wizard,
+        feasibility_passed=1,
+        draft_plan_ids=[999],  # non-empty so the generation_errors guard is reached
+        generation_errors=[{"target_id": 5, "error": "LLM timeout"}],
+    )
+    with pytest.raises(ValueError, match="generation failed"):
+        await wizard_service.confirm(db, wizard)
+
+
+# ---------------------------------------------------------------------------
+# P1: set_targets must normalize subcategory_id from DB, not client input
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_set_targets_normalizes_subcategory_id(db, wizard, target, go_getter):
+    """Client-supplied subcategory_id must be overridden by the DB value."""
+    today = date.today()
+    await wizard_service.set_scope(
+        db,
+        wizard,
+        title="T",
+        description=None,
+        start_date=today,
+        end_date=today + timedelta(days=30),
+    )
+
+    # target.subcategory_id == 1; client sends 99 (wrong)
+    updated = await wizard_service.set_targets(
+        db,
+        wizard,
+        target_specs=[{"target_id": target.id, "subcategory_id": 99, "priority": 3}],
+    )
+
+    stored = updated.target_specs[0]
+    assert stored["subcategory_id"] == target.subcategory_id, (
+        "subcategory_id in stored spec must reflect DB value, not client-supplied value"
+    )
