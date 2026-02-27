@@ -2,6 +2,8 @@
 Description=Goal Agent API
 After=network.target mariadb.service
 Wants=mariadb.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 Type=simple
@@ -18,6 +20,8 @@ ExecStart=/home/pi/goal-agent/.venv/bin/uvicorn app.main:app \
     --log-level info
 Restart=always
 RestartSec=5
+TimeoutStopSec=30
+
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=goal-agent

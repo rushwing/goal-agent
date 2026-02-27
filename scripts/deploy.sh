@@ -82,5 +82,25 @@ else
   warn "  uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop"
 fi
 
+# ── 7. Setup cron jobs ──────────────────────────────────────────────────────
+step "Setting up cron jobs…"
+
+# Detect uv binary (supports system-wide or user-local installation)
+UV_BIN=$(command -v uv 2>/dev/null || echo "$HOME/.local/bin/uv")
+BACKUP_CRON="0 3 * * * cd $ROOT && $UV_BIN run $ROOT/scripts/backup.sh >> $ROOT/logs/backup.log 2>&1"
+CRON_MARKER="# goal-agent-backup"
+
+# Create logs directory
+mkdir -p "$ROOT/logs"
+
+# Check if cron job already exists (by marker)
+if crontab -l 2>/dev/null | grep -qF "$CRON_MARKER"; then
+    step "Backup cron job already exists, skipping"
+else
+    # Add marker + cron job to user crontab
+    (crontab -l 2>/dev/null || true; echo "$CRON_MARKER"; echo "$BACKUP_CRON") | crontab -
+    step "Cron job installed: daily backup at 03:00"
+fi
+
 echo ""
 echo -e "${GREEN}✓ Deploy complete.${NC}"
