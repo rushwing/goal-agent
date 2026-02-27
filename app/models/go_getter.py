@@ -9,6 +9,7 @@ from app.models.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from app.models.check_in import CheckIn
     from app.models.best_pal import BestPal
+    from app.models.goal_group import GoalGroup
     from app.models.target import Target
     from app.models.achievement import Achievement
     from app.models.notification import Notification
@@ -35,6 +36,7 @@ class GoGetter(Base, TimestampMixin):
     # Relationships
     best_pal: Mapped[Optional["BestPal"]] = relationship("BestPal", back_populates="go_getters")
     targets: Mapped[list["Target"]] = relationship("Target", back_populates="go_getter")
+    goal_groups: Mapped[list["GoalGroup"]] = relationship("GoalGroup", back_populates="go_getter")
     check_ins: Mapped[list["CheckIn"]] = relationship("CheckIn", back_populates="go_getter")
     achievements: Mapped[list["Achievement"]] = relationship(
         "Achievement", back_populates="go_getter"
