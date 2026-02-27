@@ -14,11 +14,14 @@ import logging
 from datetime import date
 from typing import Optional
 
+from sqlalchemy import select
+
 from app.database import AsyncSessionLocal
 from app.mcp.auth import Role, require_role, verify_best_pal_owns_go_getter
 from app.mcp.server import mcp
 from app.crud import wizards as crud_wizard
 from app.models.goal_group_wizard import GoalGroupWizard
+from app.models.target import Target
 from app.services import wizard_service
 
 logger = logging.getLogger(__name__)
@@ -68,6 +71,19 @@ async def _load_wizard(db, wizard_id: int, go_getter_id: int) -> GoalGroupWizard
 def _subcategory_map_from_specs(target_specs: list[dict]) -> dict[int, int]:
     """Extract {target_id: subcategory_id} from normalized wizard target_specs."""
     return {s["target_id"]: s["subcategory_id"] for s in target_specs}
+
+
+async def _lookup_subcategory_ids(db, target_ids: list[int]) -> dict[int, int]:
+    """Query DB for authoritative {target_id: subcategory_id} for each target_id.
+
+    Raises ValueError if any target_id is not found.
+    """
+    result = await db.execute(select(Target).where(Target.id.in_(target_ids)))
+    targets = {t.id: t.subcategory_id for t in result.scalars().all()}
+    missing = set(target_ids) - set(targets)
+    if missing:
+        raise ValueError(f"Targets not found: {sorted(missing)}")
+    return targets
 
 
 def _build_constraints_dict(
@@ -292,14 +308,18 @@ async def adjust_wizard(
 
         patch: dict = {}
 
-        # ── Update target_specs ───────────────────────────────────────────
+        # ── Resolve authoritative subcategory_ids from DB for new target list ──
+        # Must happen before building either target_specs or constraints so both
+        # use the same verified mapping (no fallback-to-0 that collapses keys).
+        db_sub_map: dict[int, int] = {}
         if target_ids is not None:
             if priorities is not None and len(priorities) != len(target_ids):
                 raise ValueError("priorities must have the same length as target_ids")
+            db_sub_map = await _lookup_subcategory_ids(db, target_ids)
             patch["target_specs"] = [
                 {
                     "target_id": tid,
-                    "subcategory_id": 0,  # normalised by wizard_service.adjust → set_targets path
+                    "subcategory_id": db_sub_map[tid],
                     "priority": priorities[i] if priorities else 3,
                 }
                 for i, tid in enumerate(target_ids)
@@ -307,7 +327,7 @@ async def adjust_wizard(
 
         # ── Update constraints ────────────────────────────────────────────
         if daily_minutes_list is not None:
-            # Determine which target_ids to key constraints by
+            # Determine the ordered target list to key constraints by
             ref_ids = (
                 target_ids
                 if target_ids is not None
@@ -320,16 +340,9 @@ async def adjust_wizard(
                 )
             if preferred_days_list is not None and len(preferred_days_list) != len(ref_ids):
                 raise ValueError("preferred_days_list must have the same length as target_ids")
-            # Get subcategory_ids: prefer newly-set target_ids (look up from stored after
-            # set_targets will normalise), fall back to wizard's current target_specs
-            existing_map = _subcategory_map_from_specs(wizard.target_specs or [])
-            if target_ids is not None:
-                # After adjust processes target_specs, subcategory_ids will be normalised;
-                # we use whatever is currently stored for any overlapping targets, and skip
-                # unknown ones — the service will resolve via DB on re-generate.
-                sub_map = {tid: existing_map.get(tid, 0) for tid in ref_ids}
-            else:
-                sub_map = existing_map
+            # Use DB-resolved map for new targets; wizard's stored specs for unchanged ones.
+            stored_map = _subcategory_map_from_specs(wizard.target_specs or [])
+            sub_map = {tid: db_sub_map.get(tid) or stored_map[tid] for tid in ref_ids}
             patch["constraints"] = _build_constraints_dict(
                 ref_ids, sub_map, daily_minutes_list, preferred_days_list
             )
