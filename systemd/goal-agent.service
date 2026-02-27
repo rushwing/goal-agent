@@ -18,6 +18,11 @@ ExecStart=/home/pi/goal-agent/.venv/bin/uvicorn app.main:app \
     --log-level info
 Restart=always
 RestartSec=5
+
+# Prevent rapid restart loops
+StartLimitInterval=300
+StartLimitBurst=3
+
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=goal-agent
@@ -25,6 +30,9 @@ SyslogIdentifier=goal-agent
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
+
+# Graceful shutdown
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target

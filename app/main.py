@@ -112,4 +112,22 @@ app.mount("/mcp", mcp_app)
 
 @app.get("/health")
 async def health():
+    """Basic liveness probe."""
     return {"status": "ok", "service": "goal-agent"}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness probe with database check."""
+    from app.database import engine
+    from sqlalchemy import text
+
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "ok"}
+    except Exception as e:
+        return JSONResponse(
+            {"status": "not_ready", "database": "error", "detail": str(e)},
+            status_code=503
+        )
