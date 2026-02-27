@@ -12,6 +12,8 @@ import { registerAdminTools } from "./tools/admin.tools";
 import { registerPlanTools } from "./tools/plan.tools";
 import { registerCheckinTools } from "./tools/checkin.tools";
 import { registerReportTools } from "./tools/report.tools";
+import { registerWizardTools } from "./tools/wizard.tools";
+import { registerTracksTools } from "./tools/tracks.tools";
 
 function loadConfig(): PluginConfig {
   const raw = process.env.PLUGIN_CONFIG;
@@ -32,6 +34,8 @@ const adminTools = registerAdminTools(client);
 const planTools = registerPlanTools(client);
 const checkinTools = registerCheckinTools(client);
 const reportTools = registerReportTools(client);
+const wizardTools = registerWizardTools(client);
+const tracksTools = registerTracksTools(client);
 
 // Export all tools for OpenClaw to discover
 module.exports = {
@@ -39,4 +43,6 @@ module.exports = {
   ...planTools,
   ...checkinTools,
   ...reportTools,
+  ...wizardTools,
+  ...tracksTools,
 };

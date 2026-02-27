@@ -176,7 +176,27 @@ async def adjust(
     updates: dict = {"status": WizardStatus.adjusting}
 
     if "target_specs" in patch and patch["target_specs"] is not None:
-        updates["target_specs"] = patch["target_specs"]
+        from app.models.target import Target as _Target
+
+        validated: list[dict] = []
+        for spec in patch["target_specs"]:
+            target_id = spec.get("target_id")
+            t_result = await db.execute(select(_Target).where(_Target.id == target_id))
+            target = t_result.scalar_one_or_none()
+            if target is None:
+                raise ValueError(f"Target {target_id} not found.")
+            if target.go_getter_id != wizard.go_getter_id:
+                raise ValueError(
+                    f"Target {target_id} does not belong to go_getter {wizard.go_getter_id}."
+                )
+            validated.append(
+                {
+                    "target_id": target_id,
+                    "subcategory_id": target.subcategory_id,
+                    "priority": spec.get("priority", 3),
+                }
+            )
+        updates["target_specs"] = validated
 
     if "constraints" in patch and patch["constraints"] is not None:
         new_constraints = {str(k): v for k, v in patch["constraints"].items()}
@@ -360,6 +380,14 @@ async def _generate_and_check(db: AsyncSession, wizard: GoalGroupWizard) -> None
         target = t_result.scalar_one_or_none()
         if target is None:
             errors.append({"target_id": target_id, "error": "Target not found"})
+            continue
+        if target.go_getter_id != wizard.go_getter_id:
+            errors.append(
+                {
+                    "target_id": target_id,
+                    "error": f"Target does not belong to go_getter {wizard.go_getter_id}",
+                }
+            )
             continue
 
         # Resolve constraints

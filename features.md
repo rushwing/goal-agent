@@ -11,6 +11,7 @@
 
 ## Stage 2: Planning Engine (Critical)
 - [x] Target CRUD (create_target, update_target, delete_target, list_targets)
+- [x] `create_target` accepts optional `subcategory_id` for track taxonomy linkage
 - [x] Kimi AI plan generation (generate_plan → structured JSON)
 - [x] Milestone + task DB persistence
 - [x] GitHub auto-commit of generated plans (Markdown)
@@ -31,17 +32,31 @@
 
 ## Stage 5: Telegram & OpenClaw Integration (High)
 - [x] Telegram service (httpx async, best_pal + go_getter bots)
-- [x] APScheduler cron jobs (morning tasks, evening reminders, weekly/monthly reports)
-- [x] OpenClaw TypeScript plugin (axios HTTP client, X-Telegram-Chat-Id injection)
-- [x] Group notifications for reports
+- [x] APScheduler cron jobs (morning tasks, evening reminders, weekly/monthly/daily reports)
+- [x] Daily report summary now posted to Telegram group (matches weekly/monthly behaviour)
+- [x] OpenClaw TypeScript plugin (axios HTTP client, X-Telegram-Chat-Id injection, optional HMAC signing)
+- [x] Group notifications for daily / weekly / monthly reports
 
-## Stage 6: Gamification+ (Medium)
+## Stage 6: GoalGroup Wizard (High)
+- [x] GoalGroup + GoalGroupWizard models (migration 005/006)
+- [x] Track taxonomy (6 categories, 40 subcategories, seeded in migration 005)
+- [x] Track MCP tools: `list_track_categories`, `list_track_subcategories` (all roles)
+- [x] 8-step wizard service: scope → targets → constraints → generate → feasibility → confirm/adjust
+- [x] Wizard REST API (`/api/v1/wizards/*`) with ownership guards at every step
+- [x] Wizard MCP tools (8 tools, best_pal/admin role)
+- [x] OpenClaw: `wizard.tools.ts` and `tracks.tools.ts` bridging REST API
+- [x] Feasibility engine: 7 rules (3 blockers + 4 warnings), LLM-enriched explanations
+- [x] Draft plan isolation — live plans never mutated before `confirm_goal_group`
+- [x] Adjust path ownership validation (target must belong to the wizard's go_getter)
+- [x] Wizard TTL: 24 h auto-expiry, bulk-cancel via `expire_stale()`
+
+## Stage 7: Gamification+ (Medium)
 - [ ] Extended badge catalogue (subject mastery, consistency champion, etc.)
 - [ ] Sibling leaderboard (if multiple go getters)
 - [ ] Streak freeze mechanic (bank freeze days via XP)
 - [ ] XP shop (redeem XP for streak freezes or bonus praise)
 
-## Stage 7: Frontend (Low)
+## Stage 8: Frontend (Low)
 - [ ] FastAPI Jinja2 HTML dashboard (progress charts, recent activity)
 - [ ] React SPA (full-featured web UI, optional)
 
