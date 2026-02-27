@@ -128,7 +128,4 @@ async def health_ready():
         return {"status": "ready", "database": "ok"}
     except Exception as e:
         logger.error("Health ready check failed: %s", e)
-        return JSONResponse(
-            {"status": "not_ready", "database": "error"},
-            status_code=503
-        )
+        return JSONResponse({"status": "not_ready", "database": "error"}, status_code=503)
