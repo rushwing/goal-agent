@@ -56,16 +56,23 @@ uv run alembic upgrade head
 
 # ── 5. Install / refresh systemd unit ─────────────────────────────────────
 if [[ -f "$SYSTEMD_UNIT_SRC" ]]; then
-  if [[ "$(id -u)" -eq 0 ]]; then
-    step "Installing systemd service…"
-    # Update WorkingDirectory and ExecStart to point to this directory
-    sed "s|/home/pi/goal-agent|$ROOT|g" \
+  CURRENT_USER="$(id -un)"
+  CURRENT_GROUP="$(id -gn)"
+  _install_unit() {
+    sed -e "s|/home/pi/goal-agent|$ROOT|g" \
+        -e "s|User=pi|User=$CURRENT_USER|g" \
+        -e "s|Group=pi|Group=$CURRENT_GROUP|g" \
         "$SYSTEMD_UNIT_SRC" > "$SYSTEMD_UNIT_DST"
     systemctl daemon-reload
     systemctl enable "$SERVICE_NAME"
+  }
+  if [[ "$(id -u)" -eq 0 ]]; then
+    step "Installing systemd service…"
+    _install_unit
   else
     warn "Not running as root – skipping systemd unit install."
-    warn "Run: sudo cp $SYSTEMD_UNIT_SRC $SYSTEMD_UNIT_DST && sudo systemctl daemon-reload"
+    warn "Run the following to install (substitutes correct user/paths):"
+    warn "  sudo bash -c \"sed -e 's|/home/pi/goal-agent|$ROOT|g' -e 's|User=pi|User=$CURRENT_USER|g' -e 's|Group=pi|Group=$CURRENT_GROUP|g' $SYSTEMD_UNIT_SRC > $SYSTEMD_UNIT_DST && systemctl daemon-reload && systemctl enable $SERVICE_NAME\""
   fi
 fi
 
