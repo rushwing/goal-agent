@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
 from sqlalchemy import select, update
@@ -61,7 +61,7 @@ async def record_change(
     new_value: Optional[dict] = None,
 ) -> GoalGroupChange:
     """Record a structural change and update last_change_at on the group."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     change = GoalGroupChange(
         group_id=group.id,
         change_type=change_type,
