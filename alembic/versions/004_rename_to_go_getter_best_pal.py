@@ -48,6 +48,61 @@ def _get_fk_name(conn, table: str, column: str, ref_table: str) -> str | None:
     return row[0] if row else None
 
 
+def _index_exists(conn, table: str, index_name: str) -> bool:
+    """Check if an index exists in the current database."""
+    result = conn.execute(
+        sa.text(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = :table
+              AND INDEX_NAME = :index_name
+            """
+        ),
+        {"table": table, "index_name": index_name},
+    )
+    row = result.fetchone()
+    return row[0] > 0 if row else False
+
+
+def _constraint_exists(conn, table: str, constraint_name: str) -> bool:
+    """Check if a constraint exists in the current database."""
+    result = conn.execute(
+        sa.text(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.TABLE_CONSTRAINTS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = :table
+              AND CONSTRAINT_NAME = :constraint_name
+            """
+        ),
+        {"table": table, "constraint_name": constraint_name},
+    )
+    row = result.fetchone()
+    return row[0] > 0 if row else False
+
+
+def _get_fks_referencing_table(conn, ref_table: str) -> list[dict]:
+    """Find all FK constraints that reference a specific table."""
+    result = conn.execute(
+        sa.text(
+            """
+            SELECT
+                TABLE_NAME,
+                CONSTRAINT_NAME,
+                COLUMN_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND REFERENCED_TABLE_NAME = :ref_table
+            """
+        ),
+        {"ref_table": ref_table},
+    )
+    return [dict(row._mapping) for row in result.fetchall()]
+
+
 def upgrade() -> None:
     conn = op.get_bind()
 
@@ -70,17 +125,37 @@ def upgrade() -> None:
     fk_pupils_parent = _get_fk_name(conn, "pupils", "parent_id", "parents")
     if fk_pupils_parent:
         op.drop_constraint(fk_pupils_parent, "pupils", type_="foreignkey")
-    # MariaDB may have auto-dropped the backing index when the FK was dropped;
-    # use IF EXISTS so we don't fail on a re-run or when MariaDB already cleaned it up
-    op.execute("DROP INDEX IF EXISTS ix_pupils_parent_id ON pupils")
+    # Only drop index if it exists (MariaDB may have auto-dropped it with the FK)
+    if _index_exists(conn, "pupils", "ix_pupils_parent_id"):
+        op.drop_index("ix_pupils_parent_id", table_name="pupils")
 
     # ------------------------------------------------------------------
-    # 2. Drop old unique constraints (will be recreated with new names)
+    # 2. Drop FKs that use unique constraints we're about to drop
+    # ------------------------------------------------------------------
+    # The unique constraint uq_checkin_task_pupil creates an index that is used by
+    # FK check_ins_ibfk_2 (task_id -> tasks.id). We must drop this FK first.
+    fk_checkins_task = _get_fk_name(conn, "check_ins", "task_id", "tasks")
+    if fk_checkins_task:
+        op.drop_constraint(fk_checkins_task, "check_ins", type_="foreignkey")
+
+    # Also drop any FKs referencing these tables
+    for fk_info in _get_fks_referencing_table(conn, "check_ins"):
+        op.drop_constraint(fk_info["CONSTRAINT_NAME"], fk_info["TABLE_NAME"], type_="foreignkey")
+    for fk_info in _get_fks_referencing_table(conn, "achievements"):
+        op.drop_constraint(fk_info["CONSTRAINT_NAME"], fk_info["TABLE_NAME"], type_="foreignkey")
+    for fk_info in _get_fks_referencing_table(conn, "reports"):
+        op.drop_constraint(fk_info["CONSTRAINT_NAME"], fk_info["TABLE_NAME"], type_="foreignkey")
+
+    # ------------------------------------------------------------------
+    # 3. Drop old unique constraints (will be recreated with new names)
     # ------------------------------------------------------------------
 
-    op.drop_constraint("uq_checkin_task_pupil", "check_ins", type_="unique")
-    op.drop_constraint("uq_achievement_pupil_badge", "achievements", type_="unique")
-    op.drop_constraint("uq_report_identity", "reports", type_="unique")
+    if _constraint_exists(conn, "check_ins", "uq_checkin_task_pupil"):
+        op.drop_constraint("uq_checkin_task_pupil", "check_ins", type_="unique")
+    if _constraint_exists(conn, "achievements", "uq_achievement_pupil_badge"):
+        op.drop_constraint("uq_achievement_pupil_badge", "achievements", type_="unique")
+    if _constraint_exists(conn, "reports", "uq_report_identity"):
+        op.drop_constraint("uq_report_identity", "reports", type_="unique")
 
     # ------------------------------------------------------------------
     # 3. Rename tables
