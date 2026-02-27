@@ -12,11 +12,11 @@ mcp = FastMCP(
 )
 
 # Import tool modules to register @mcp.tool decorators
-from app.mcp.tools import (
+from app.mcp.tools import (  # noqa: E402, F401
     admin_tools,
     plan_tools,
     checkin_tools,
     report_tools,
     wizard_tools,
     tracks_tools,
-)  # noqa: E402, F401
+)
