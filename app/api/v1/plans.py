@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.api.v1.deps import require_best_pal_or_admin, require_admin, verify_best_pal_owns_go_getter
 from app.crud import crud_target, crud_plan, crud_go_getter
+from app.services.goal_group_service import assert_subcategory_available
 from app.schemas.target import TargetCreate, TargetUpdate, TargetResponse
 from app.schemas.plan import PlanUpdate, PlanResponse, GeneratePlanRequest
 from app.services import plan_generator, github_service
@@ -36,6 +37,13 @@ async def create_target(
     chat_id: Annotated[int, Depends(require_best_pal_or_admin)],
 ):
     await verify_best_pal_owns_go_getter(body.go_getter_id, chat_id, db)
+    if body.subcategory_id is not None:
+        try:
+            await assert_subcategory_available(
+                db, go_getter_id=body.go_getter_id, subcategory_id=body.subcategory_id
+            )
+        except ValueError as e:
+            raise HTTPException(409, str(e)) from e
     return await crud_target.create(db, obj_in=body)
 
 
@@ -49,6 +57,18 @@ async def update_target(
     target = await crud_target.get(db, target_id)
     if not target:
         raise HTTPException(404, "Target not found")
+    # If subcategory is being changed, re-check uniqueness (exclude self)
+    new_sub = body.subcategory_id
+    if new_sub is not None and new_sub != target.subcategory_id:
+        try:
+            await assert_subcategory_available(
+                db,
+                go_getter_id=target.go_getter_id,
+                subcategory_id=new_sub,
+                exclude_target_id=target_id,
+            )
+        except ValueError as e:
+            raise HTTPException(409, str(e)) from e
     return await crud_target.update(db, db_obj=target, obj_in=body)
 
 

@@ -8,7 +8,11 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import require_best_pal_or_admin, verify_best_pal_owns_go_getter
-from app.crud.goal_groups import create as crud_create_group, get as crud_get_group
+from app.crud.goal_groups import (
+    create as crud_create_group,
+    get as crud_get_group,
+    get_active_for_go_getter,
+)
 from app.crud.targets import crud_target
 from app.database import get_db
 from app.models.goal_group import GoalGroupStatus
@@ -63,8 +67,18 @@ async def create_goal_group(
     db: Annotated[AsyncSession, Depends(get_db)],
     chat_id: Annotated[int, Depends(require_best_pal_or_admin)],
 ):
-    """Create a new GoalGroup (time-bounded planning window) for a GoGetter."""
+    """Create a new GoalGroup (time-bounded planning window) for a GoGetter.
+
+    Enforces the invariant: one active GoalGroup per GoGetter at a time.
+    """
     await verify_best_pal_owns_go_getter(body.go_getter_id, chat_id, db)
+    existing = await get_active_for_go_getter(db, body.go_getter_id)
+    if existing:
+        raise HTTPException(
+            409,
+            f"GoGetter already has an active GoalGroup (id={existing.id}). "
+            "Complete or archive it before creating a new one.",
+        )
     group = await crud_create_group(
         db,
         go_getter_id=body.go_getter_id,
