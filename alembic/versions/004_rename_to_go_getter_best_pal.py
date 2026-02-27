@@ -125,7 +125,7 @@ def upgrade() -> None:
     fk_pupils_parent = _get_fk_name(conn, "pupils", "parent_id", "parents")
     if fk_pupils_parent:
         op.drop_constraint(fk_pupils_parent, "pupils", type_="foreignkey")
-    # Only drop index if it exists
+    # Only drop index if it exists (MariaDB may have auto-dropped it with the FK)
     if _index_exists(conn, "pupils", "ix_pupils_parent_id"):
         op.drop_index("ix_pupils_parent_id", table_name="pupils")
 
