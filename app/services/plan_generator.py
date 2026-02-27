@@ -54,6 +54,10 @@ Rules:
 """
 
 
+_DEFAULT_DAILY_MINUTES = 60
+_DEFAULT_PREFERRED_DAYS = [0, 1, 2, 3, 4, 5, 6]  # all days
+
+
 def _build_user_prompt(
     target: Target,
     pupil_name: str,
@@ -90,9 +94,10 @@ async def generate_plan(
     grade: str,
     start_date: date,
     end_date: date,
-    daily_study_minutes: int,
-    preferred_days: list[int],
+    daily_study_minutes: int | None = None,
+    preferred_days: list[int] | None = None,
     extra_instructions: str | None = None,
+    initial_status: PlanStatus = PlanStatus.active,
 ) -> Plan:
     """
     Call Kimi to generate a structured plan, persist to DB, return Plan object.
@@ -103,8 +108,8 @@ async def generate_plan(
         grade,
         start_date,
         end_date,
-        daily_study_minutes,
-        preferred_days,
+        daily_study_minutes if daily_study_minutes is not None else _DEFAULT_DAILY_MINUTES,
+        preferred_days if preferred_days is not None else _DEFAULT_PREFERRED_DAYS,
         extra_instructions,
     )
 
@@ -134,13 +139,13 @@ async def generate_plan(
 
     total_weeks = max(1, (((end_date - start_date).days + 1) + 6) // 7)
 
-    # Deactivate any existing active plans for this go getter (single-active-plan invariant)
+    # Deactivate any existing active plan for this specific target.
+    # One active plan per target — not per go_getter — to allow parallel tracks
+    # (e.g. study + fitness running concurrently).
     from sqlalchemy import select as _select
 
     existing_active = await db.execute(
-        _select(Plan)
-        .join(Target, Plan.target_id == Target.id)
-        .where(Target.go_getter_id == target.go_getter_id, Plan.status == PlanStatus.active)
+        _select(Plan).where(Plan.target_id == target.id, Plan.status == PlanStatus.active)
     )
     for old_plan in existing_active.scalars().all():
         old_plan.status = PlanStatus.completed
@@ -154,7 +159,7 @@ async def generate_plan(
         start_date=start_date,
         end_date=end_date,
         total_weeks=total_weeks,
-        status=PlanStatus.active,
+        status=initial_status,
         llm_prompt_tokens=prompt_tokens,
         llm_completion_tokens=completion_tokens,
     )

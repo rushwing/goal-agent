@@ -1,7 +1,7 @@
 """GoalGroup service: constraint enforcement and dynamic re-planning orchestration."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 from sqlalchemy import select
@@ -13,6 +13,7 @@ from app.models.goal_group import ChangeType, GoalGroup, GoalGroupChange
 from app.models.plan import Plan, PlanStatus
 from app.models.target import Target, TargetStatus
 from app.models.task import Task, TaskStatus
+from app.models.weekly_milestone import WeeklyMilestone
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ _CHANGE_COOLDOWN_DAYS = 7
 
 
 def _now_utc() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 async def assert_change_allowed(group: GoalGroup) -> None:
@@ -93,7 +94,6 @@ async def _supersede_future_tasks(db: AsyncSession, plan: Plan) -> None:
 
     Current ISO week's tasks are left untouched (freeze rule).
     """
-    today = _now_utc().date()
     replan_from = _next_monday(_now_utc()).date()
 
     for milestone in plan.milestones:
@@ -166,7 +166,7 @@ async def trigger_replan(
             result = await db.execute(
                 select(Plan)
                 .where(Plan.id == active_plan.id)
-                .options(selectinload(Plan.milestones).selectinload("tasks"))
+                .options(selectinload(Plan.milestones).selectinload(WeeklyMilestone.tasks))
             )
             active_plan_full = result.scalar_one()
             await _supersede_future_tasks(db, active_plan_full)
@@ -272,7 +272,7 @@ async def remove_target_from_group(
     result = await db.execute(
         select(Plan)
         .where(Plan.target_id == target.id, Plan.status == PlanStatus.active)
-        .options(selectinload(Plan.milestones).selectinload("tasks"))
+        .options(selectinload(Plan.milestones).selectinload(WeeklyMilestone.tasks))
     )
     active_plan = result.scalar_one_or_none()
     if active_plan:

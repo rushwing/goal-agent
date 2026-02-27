@@ -2,7 +2,7 @@ import enum
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, JSON, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -78,7 +78,7 @@ class GoalGroupChange(Base):
     triggered_replan_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     replan_plan_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default="now()", nullable=False
+        DateTime, server_default=text("now()"), nullable=False
     )
 
     group: Mapped["GoalGroup"] = relationship("GoalGroup", back_populates="changes")

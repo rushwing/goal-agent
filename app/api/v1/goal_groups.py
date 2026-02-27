@@ -80,11 +80,12 @@ async def create_goal_group(
 async def get_goal_group(
     group_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[int, Depends(require_best_pal_or_admin)],
+    chat_id: Annotated[int, Depends(require_best_pal_or_admin)],
 ):
     group = await crud_get_group(db, group_id)
     if not group:
         raise HTTPException(404, "GoalGroup not found")
+    await verify_best_pal_owns_go_getter(group.go_getter_id, chat_id, db)
     return group
 
 
@@ -118,7 +119,7 @@ async def add_target(
     try:
         change = await add_target_to_group(db, group=group, target=target)
     except ValueError as e:
-        raise HTTPException(409, str(e))
+        raise HTTPException(409, str(e)) from e
 
     return ChangeResponse(change_id=change.id, message="Target added and re-planning triggered.")
 
@@ -153,6 +154,6 @@ async def remove_target(
     try:
         change = await remove_target_from_group(db, group=group, target=target)
     except ValueError as e:
-        raise HTTPException(409, str(e))
+        raise HTTPException(409, str(e)) from e
 
     return ChangeResponse(change_id=change.id, message="Target removed and re-planning triggered.")
