@@ -21,6 +21,9 @@
     "create_target", "update_target", "delete_target", "list_targets",
     "generate_plan", "update_plan", "delete_plan", "list_plans", "get_plan_detail",
     "list_today_tasks", "list_week_tasks", "checkin_task", "skip_task", "get_go_getter_progress",
-    "generate_daily_report", "generate_weekly_report", "generate_monthly_report", "list_reports"
+    "generate_daily_report", "generate_weekly_report", "generate_monthly_report", "list_reports",
+    "start_goal_group_wizard", "get_wizard_status", "set_wizard_scope",
+    "set_wizard_targets", "set_wizard_constraints", "adjust_wizard",
+    "confirm_goal_group", "cancel_goal_group_wizard"
   ]
 }
