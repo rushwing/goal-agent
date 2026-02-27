@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Enum, ForeignKey, Integer, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -7,7 +7,9 @@ from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.go_getter import GoGetter
+    from app.models.goal_group import GoalGroup
     from app.models.plan import Plan
+    from app.models.track_subcategory import TrackSubcategory
 
 import enum
 
@@ -43,6 +45,19 @@ class Target(Base, TimestampMixin):
         Enum(TargetStatus), nullable=False, default=TargetStatus.active
     )
 
+    # Optional track subcategory (e.g. Math under Study)
+    subcategory_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("track_subcategories.id"), nullable=True
+    )
+    # Optional GoalGroup this target belongs to
+    group_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("goal_groups.id"), nullable=True
+    )
+
     # Relationships
     go_getter: Mapped["GoGetter"] = relationship("GoGetter", back_populates="targets")
     plans: Mapped[list["Plan"]] = relationship("Plan", back_populates="target")
+    subcategory: Mapped[Optional["TrackSubcategory"]] = relationship(
+        "TrackSubcategory", back_populates="targets"
+    )
+    group: Mapped[Optional["GoalGroup"]] = relationship("GoalGroup", back_populates="targets")

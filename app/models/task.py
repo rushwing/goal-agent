@@ -22,6 +22,12 @@ class TaskType(str, enum.Enum):
     other = "other"
 
 
+class TaskStatus(str, enum.Enum):
+    active = "active"
+    cancelled = "cancelled"
+    superseded = "superseded"  # replaced by re-planning; check-ins still valid
+
+
 class Task(Base, TimestampMixin):
     __tablename__ = "tasks"
 
@@ -39,6 +45,9 @@ class Task(Base, TimestampMixin):
         Enum(TaskType), nullable=False, default=TaskType.practice
     )
     is_optional: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    status: Mapped[TaskStatus] = mapped_column(
+        Enum(TaskStatus), nullable=False, default=TaskStatus.active
+    )
 
     # Relationships
     milestone: Mapped["WeeklyMilestone"] = relationship("WeeklyMilestone", back_populates="tasks")

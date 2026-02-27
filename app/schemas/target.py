@@ -14,6 +14,8 @@ class TargetBase(BaseModel):
 
 class TargetCreate(TargetBase):
     go_getter_id: int
+    subcategory_id: Optional[int] = None
+    group_id: Optional[int] = None
 
 
 class TargetUpdate(BaseModel):
@@ -24,6 +26,8 @@ class TargetUpdate(BaseModel):
     vacation_year: Optional[int] = Field(None, ge=2020, le=2100)
     priority: Optional[int] = Field(None, ge=1, le=5)
     status: Optional[TargetStatus] = None
+    subcategory_id: Optional[int] = None
+    group_id: Optional[int] = None
 
 
 class TargetResponse(TargetBase):
@@ -31,3 +35,5 @@ class TargetResponse(TargetBase):
     id: int
     go_getter_id: int
     status: TargetStatus
+    subcategory_id: Optional[int] = None
+    group_id: Optional[int] = None
