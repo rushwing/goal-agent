@@ -1,4 +1,5 @@
 {
+  "id": "goal-agent",
   "name": "goal-agent",
   "version": "0.1.0",
   "description": "AI-powered goal and habit tracking agent tools",
