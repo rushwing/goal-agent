@@ -164,8 +164,11 @@ echo -e "${GREEN}✓ Deploy complete.${NC}"
 
 # ── Post-deploy: warn if .env still contains placeholder values ─────────────
 _has_placeholder() {
+  # Match exact placeholder values from .env.example.
+  # Anchored patterns (=$) prevent false positives on key names that contain
+  # the substring (e.g. DB_PASSWORD=real_secret must not trigger =password$).
   grep -qE \
-    'sk-your-key-here|123456:ABCdef|789012:GHIjkl|-1001234567890|ghp_your_token_here|change-me|password' \
+    'sk-your-key-here|123456:ABCdef|789012:GHIjkl|ghp_your_token_here|change-me|=password$|://[^:]+:password@|=-1001234567890$' \
     .env 2>/dev/null
 }
 if _has_placeholder; then
