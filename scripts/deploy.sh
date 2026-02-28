@@ -96,8 +96,10 @@ JSON
     fi
 
     # Uninstall any existing copy first (clears duplicate entries from old installs).
-    # Non-fatal: silently succeeds whether the plugin was registered or not.
-    node "$OPENCLAW_MJS" plugins uninstall openclaw-goal-agent 2>/dev/null || true
+    # Pipe "y" to answer the interactive confirmation prompt non-interactively.
+    # Also remove the legacy extensions directory left behind by non-linked installs.
+    echo y | node "$OPENCLAW_MJS" plugins uninstall openclaw-goal-agent 2>/dev/null || true
+    rm -rf "$HOME/.openclaw/extensions/goal-agent"
 
     step "Installing OpenClaw plugin (openclaw-goal-agent)…"
     node "$OPENCLAW_MJS" plugins install --link "$PLUGIN_DIR" \
