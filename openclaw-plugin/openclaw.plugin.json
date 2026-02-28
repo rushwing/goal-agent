@@ -1,31 +1,60 @@
 {
-  "id": "goal-agent",
+  "id": "openclaw-goal-agent",
   "name": "goal-agent",
   "version": "0.1.0",
   "description": "AI-powered goal and habit tracking agent tools",
   "main": "dist/index.js",
-  "config": {
-    "apiBaseUrl": {
-      "type": "string",
-      "description": "Base URL of the Goal Agent API (e.g. http://192.168.1.100:8000/api/v1)",
-      "required": true
-    },
-    "telegramChatId": {
-      "type": "string",
-      "description": "Your Telegram Chat ID for role-based access",
-      "required": true
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["apiBaseUrl", "telegramChatId"],
+    "properties": {
+      "apiBaseUrl": {
+        "type": "string",
+        "description": "Base URL of the Goal Agent API (e.g. http://192.168.1.100:8000/api/v1)"
+      },
+      "telegramChatId": {
+        "type": "string",
+        "description": "Your Telegram Chat ID for role-based access"
+      }
     }
   },
   "tools": [
-    "add_go_getter", "update_go_getter", "remove_go_getter", "list_go_getters",
-    "add_best_pal", "update_best_pal", "remove_best_pal", "list_best_pals",
-    "create_target", "update_target", "delete_target", "list_targets",
-    "generate_plan", "update_plan", "delete_plan", "list_plans", "get_plan_detail",
-    "list_today_tasks", "list_week_tasks", "checkin_task", "skip_task", "get_go_getter_progress",
-    "generate_daily_report", "generate_weekly_report", "generate_monthly_report", "list_reports",
-    "start_goal_group_wizard", "get_wizard_status", "set_wizard_scope",
-    "set_wizard_targets", "set_wizard_constraints", "adjust_wizard",
-    "confirm_goal_group", "cancel_goal_group_wizard",
-    "list_track_categories", "list_track_subcategories"
+    "add_go_getter",
+    "update_go_getter",
+    "remove_go_getter",
+    "list_go_getters",
+    "add_best_pal",
+    "update_best_pal",
+    "remove_best_pal",
+    "list_best_pals",
+    "create_target",
+    "update_target",
+    "delete_target",
+    "list_targets",
+    "generate_plan",
+    "update_plan",
+    "delete_plan",
+    "list_plans",
+    "get_plan_detail",
+    "list_today_tasks",
+    "list_week_tasks",
+    "checkin_task",
+    "skip_task",
+    "get_go_getter_progress",
+    "generate_daily_report",
+    "generate_weekly_report",
+    "generate_monthly_report",
+    "list_reports",
+    "start_goal_group_wizard",
+    "get_wizard_status",
+    "set_wizard_scope",
+    "set_wizard_targets",
+    "set_wizard_constraints",
+    "adjust_wizard",
+    "confirm_goal_group",
+    "cancel_goal_group_wizard",
+    "list_track_categories",
+    "list_track_subcategories"
   ]
 }
