@@ -97,7 +97,7 @@ cd goal-agent
 ./scripts/setup.sh --dev        # installs uv, creates .venv, copies .env.example → .env
 ```
 
-Edit `.env` with your secrets (see [Environment Variables](#environment-variables)).
+Edit `.env` with your secrets — see [`docs/env-setup.md`](docs/env-setup.md) for a step-by-step guide (bot tokens, API keys, chat IDs, HMAC secret).
 
 ### 2 – Database
 
@@ -181,7 +181,7 @@ collation-server        = utf8mb4_unicode_ci
 ### Docker Compose (alternative)
 
 ```bash
-cp .env.example .env            # fill in secrets
+cp -n .env.example .env         # copy only if .env does not already exist
 docker compose up -d            # starts api + db
 docker compose --profile migrate up migrate   # run migrations once
 docker compose logs -f api      # follow logs
@@ -284,24 +284,21 @@ The TypeScript plugin lives in `openclaw-plugin/`. It calls FastAPI REST endpoin
 `deploy.sh` builds and registers the plugin automatically on every deploy:
 
 ```
-► Building OpenClaw plugin…        # npm install + npm run build
+► Building OpenClaw plugin…        # npm install + npm run build (best-effort)
+► Writing plugin config.json…      # seeded from APP_PORT + ADMIN_CHAT_IDS in .env
 ► Installing OpenClaw plugin…      # plugins install --link openclaw-plugin/
 ```
 
-No manual steps needed after the first `./scripts/deploy.sh`.
+No manual steps needed after the first `./scripts/deploy.sh`. Build failures are non-fatal — a warning is printed and the service deploy continues.
 
 ### Configuration
 
-Set `PLUGIN_CONFIG` in OpenClaw for each user profile:
+`deploy.sh` auto-writes `openclaw-plugin/config.json` seeded from your `.env` (`APP_PORT` + first `ADMIN_CHAT_IDS` entry). This is used as a fallback when `PLUGIN_CONFIG` is not set in OpenClaw.
+
+For per-user role override, set `PLUGIN_CONFIG` in the OpenClaw UI:
 
 ```json
 { "apiBaseUrl": "http://raspberry-pi-ip:8000/api/v1", "telegramChatId": "123456789" }
-```
-
-Optional HMAC signing (production):
-
-```json
-{ "apiBaseUrl": "...", "telegramChatId": "...", "hmacSecret": "your-shared-secret" }
 ```
 
 Two configs are typical — one with a best pal's chat ID (accesses wizard, plan, report, tracks tools), one with a go getter's (accesses check-in tools). The server resolves the role from `X-Telegram-Chat-Id` automatically.

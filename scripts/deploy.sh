@@ -51,6 +51,13 @@ if [[ ! -f ".env" ]]; then
   cp .env.example .env
 fi
 
+# Load .env into the current shell so subsequent steps can read its values
+# (e.g. APP_PORT, ADMIN_CHAT_IDS for plugin config.json generation).
+# shellcheck disable=SC1091
+set -o allexport
+source .env
+set +o allexport
+
 # ── 4. Run migrations ──────────────────────────────────────────────────────
 step "Running database migrations…"
 uv run alembic upgrade head
@@ -154,3 +161,16 @@ fi
 
 echo ""
 echo -e "${GREEN}✓ Deploy complete.${NC}"
+
+# ── Post-deploy: warn if .env still contains placeholder values ─────────────
+_has_placeholder() {
+  grep -qE \
+    'sk-your-key-here|123456:ABCdef|789012:GHIjkl|-1001234567890|ghp_your_token_here|change-me|password' \
+    .env 2>/dev/null
+}
+if _has_placeholder; then
+  echo ""
+  warn "⚠  .env still contains placeholder values."
+  warn "   Follow the setup guide to fill in your secrets:"
+  warn "   docs/env-setup.md"
+fi

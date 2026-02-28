@@ -36,24 +36,11 @@ cd goal-agent
 $EDITOR .env
 ```
 
-Key values to fill in:
+Follow the step-by-step guide to obtain each value (bot tokens, API keys, chat IDs, etc.):
 
-```env
-DATABASE_URL=mysql+aiomysql://planner:yourpassword@localhost:3306/goal_agent
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=goal_agent
-DB_USER=planner
-DB_PASSWORD=yourpassword
+> **[docs/env-setup.md](env-setup.md)** — detailed instructions for every `.env` variable
 
-KIMI_API_KEY=sk-...
-TELEGRAM_BEST_PAL_BOT_TOKEN=123456:ABCdef...
-TELEGRAM_GO_GETTER_BOT_TOKEN=789012:GHIjkl...
-TELEGRAM_GROUP_CHAT_ID=-1001234567890
-GITHUB_PAT=ghp_...
-GITHUB_DATA_REPO=username/goal-agent-data
-ADMIN_CHAT_IDS=123456789
-```
+`deploy.sh` will warn you at the end if any placeholder values remain unfilled.
 
 ### 3. Initialise the database
 
@@ -106,13 +93,27 @@ The plugin is built and installed automatically by `deploy.sh` (step 5). No manu
 ### What `deploy.sh` does
 
 ```
-► Building OpenClaw plugin…        # npm install + npm run build
-► Installing OpenClaw plugin…      # node ~/.openclaw/openclaw.mjs plugins install --link
+► Building OpenClaw plugin…        # npm install + npm run build (best-effort — failure does not abort deploy)
+► Writing plugin config.json…      # seeded from APP_PORT + ADMIN_CHAT_IDS in .env (only if missing or .env is newer)
+► Installing OpenClaw plugin…      # node ~/.openclaw/openclaw.mjs plugins install --link (non-fatal if already registered)
 ```
 
-### Configure the plugin in OpenClaw
+> **Note**: The build step is best-effort. If `npm install` or `npm run build` fails (e.g. due to network issues), a warning is printed and the service deploy continues normally.
 
-The plugin reads its config from the `PLUGIN_CONFIG` environment variable injected by OpenClaw. Set it via the OpenClaw UI or config file.
+### Plugin config (`config.json` vs `PLUGIN_CONFIG`)
+
+`deploy.sh` automatically writes `openclaw-plugin/config.json` the first time (or whenever `.env` is newer), seeded from your `.env`:
+
+```json
+{
+  "apiBaseUrl": "http://localhost:<APP_PORT>/api/v1",
+  "telegramChatId": "<first value in ADMIN_CHAT_IDS>"
+}
+```
+
+This `config.json` is used as a **fallback** when the `PLUGIN_CONFIG` environment variable is not set. It is gitignored and must not be committed.
+
+**For multi-user setups**, override per-user via `PLUGIN_CONFIG` in the OpenClaw UI or config file:
 
 **Best Pal config** (parent — accesses wizard, plan, report, tracks tools):
 
@@ -169,7 +170,8 @@ git pull origin main
 |------|-------------------|
 | uv sync | no-op if deps unchanged |
 | Alembic migrate | only runs unapplied migrations |
-| OpenClaw plugin build | rebuilds from source |
+| OpenClaw plugin build | rebuilds from source (best-effort — failure is non-fatal) |
+| plugin `config.json` | written only if missing or `.env` is newer |
 | OpenClaw plugin install | re-registers (non-fatal if already registered) |
 | systemd reload | `reload-or-restart` — brief or zero downtime |
 | cron job | skips if already installed |
@@ -204,6 +206,10 @@ Common causes: missing `.env`, database not running, wrong `DATABASE_URL`.
 
 ### Plugin not showing tools in OpenClaw
 
-- Check `PLUGIN_CONFIG` is set and valid JSON
 - Check the API is reachable: `curl http://localhost:8000/health`
-- Check the `telegramChatId` matches a registered user (`admin`, `best_pal`, or `go_getter`)
+- Check that `openclaw-plugin/config.json` exists (created by `deploy.sh`); or that `PLUGIN_CONFIG` is set and valid JSON in your OpenClaw profile
+- Check the `telegramChatId` in `config.json` / `PLUGIN_CONFIG` matches a registered user (`admin`, `best_pal`, or `go_getter`)
+
+### `config.json` has wrong `telegramChatId`
+
+`deploy.sh` seeds `config.json` with the first entry from `ADMIN_CHAT_IDS`. To use a different chat ID (e.g. for a go_getter user), set `PLUGIN_CONFIG` in the OpenClaw UI for that profile — it takes precedence over `config.json`.
