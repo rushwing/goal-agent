@@ -83,42 +83,6 @@ else
     APP_PORT="${APP_PORT:-8000}"
     ADMIN_CHAT_ID="${ADMIN_CHAT_IDS%%,*}"   # first entry only
 
-    # ── Patch openclaw.json (canonical config location) ──────────────────────
-    # OpenClaw injects plugins.entries.<id>.config as PLUGIN_CONFIG at runtime.
-    # This is the authoritative place; config.json below is only a fallback.
-    OPENCLAW_JSON="$HOME/.openclaw/openclaw.json"
-    if [[ -f "$OPENCLAW_JSON" ]]; then
-      step "Patching openclaw.json plugin config…"
-      python3 - "$OPENCLAW_JSON" "${APP_PORT}" "${ADMIN_CHAT_ID}" "${PLUGIN_DIR}" <<'PYEOF'
-import json, sys
-path, port, chat_id, plugin_dir = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-with open(path) as f:
-    cfg = json.load(f)
-
-# Set plugin config (canonical PLUGIN_CONFIG injection point)
-entry = cfg.setdefault("plugins", {}).setdefault("entries", {}).setdefault("openclaw-goal-agent", {})
-entry["config"] = {
-    "apiBaseUrl": f"http://localhost:{port}/api/v1",
-    "telegramChatId": chat_id,
-}
-
-# Remove plugin_dir from plugins.load.paths if present.
-# plugins.installs already tracks the linked install; having the same path
-# in load.paths causes the plugin to be loaded twice, producing 36 tool-name
-# conflicts and a fatal TypeError (Cannot read properties of undefined) on startup.
-load_paths = cfg.get("plugins", {}).get("load", {}).get("paths", [])
-if plugin_dir in load_paths:
-    load_paths.remove(plugin_dir)
-    cfg["plugins"]["load"]["paths"] = load_paths
-    print(f"  removed {plugin_dir} from plugins.load.paths (prevented duplicate load)")
-
-with open(path, "w") as f:
-    json.dump(cfg, f, indent=2, ensure_ascii=False)
-    f.write("\n")
-print(f"  apiBaseUrl=http://localhost:{port}/api/v1  telegramChatId={chat_id}")
-PYEOF
-    fi
-
     # ── Write config.json as fallback (used when PLUGIN_CONFIG env var absent) ─
     CONFIG_FILE="$PLUGIN_DIR/config.json"
     if [[ ! -f "$CONFIG_FILE" ]] || [[ ".env" -nt "$CONFIG_FILE" ]]; then
@@ -131,15 +95,54 @@ PYEOF
 JSON
     fi
 
-    # Uninstall any existing copy first (clears duplicate entries from old installs).
-    # Pipe "y" to answer the interactive confirmation prompt non-interactively.
-    # Also remove the legacy extensions directory left behind by non-linked installs.
+    # ── Uninstall → clean legacy dir → install (fresh registration) ──────────
+    # Uninstall first so plugins.entries/installs are clean before re-installing.
+    # Pipe "y" to skip the interactive confirmation prompt.
     echo y | node "$OPENCLAW_MJS" plugins uninstall openclaw-goal-agent 2>/dev/null || true
     rm -rf "$HOME/.openclaw/extensions/goal-agent"
 
     step "Installing OpenClaw plugin (openclaw-goal-agent)…"
     node "$OPENCLAW_MJS" plugins install --link "$PLUGIN_DIR" \
       || warn "OpenClaw plugin install returned non-zero — continuing."
+
+    # ── Patch openclaw.json AFTER install ─────────────────────────────────────
+    # Must run after `plugins install` so plugins.entries.openclaw-goal-agent
+    # already exists; patching before install causes config-validation errors
+    # ("plugin not found") because the entry references an unregistered plugin.
+    #
+    # Two tasks:
+    #   1. Inject apiBaseUrl + telegramChatId into the entry's config block
+    #      (OpenClaw injects this as PLUGIN_CONFIG at runtime).
+    #   2. Remove plugin_dir from plugins.load.paths if present — having it in
+    #      both load.paths AND installs causes the plugin to load twice, producing
+    #      36 tool-name conflicts and a fatal TypeError on gateway startup.
+    OPENCLAW_JSON="$HOME/.openclaw/openclaw.json"
+    if [[ -f "$OPENCLAW_JSON" ]]; then
+      step "Patching openclaw.json plugin config…"
+      python3 - "$OPENCLAW_JSON" "${APP_PORT}" "${ADMIN_CHAT_ID}" "${PLUGIN_DIR}" <<'PYEOF'
+import json, sys
+path, port, chat_id, plugin_dir = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+with open(path) as f:
+    cfg = json.load(f)
+
+entry = cfg.setdefault("plugins", {}).setdefault("entries", {}).setdefault("openclaw-goal-agent", {})
+entry["config"] = {
+    "apiBaseUrl": f"http://localhost:{port}/api/v1",
+    "telegramChatId": chat_id,
+}
+
+load_paths = cfg.get("plugins", {}).get("load", {}).get("paths", [])
+if plugin_dir in load_paths:
+    load_paths.remove(plugin_dir)
+    cfg["plugins"]["load"]["paths"] = load_paths
+    print(f"  removed {plugin_dir} from plugins.load.paths (prevented duplicate load)")
+
+with open(path, "w") as f:
+    json.dump(cfg, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+print(f"  apiBaseUrl=http://localhost:{port}/api/v1  telegramChatId={chat_id}")
+PYEOF
+    fi
   else
     warn "OpenClaw plugin build failed — skipping plugin install. Service deploy continues."
   fi
