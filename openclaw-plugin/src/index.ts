@@ -67,9 +67,26 @@ const allTools = {
   ...tracksTools,
 };
 
-// OpenClaw plugin interface
+// Minimal OpenClaw plugin API shape needed for tool registration.
+// registerTool accepts either:
+//   - An AnyAgentTool object  → stored as factory = (_ctx) => tool  (OBJECT path)
+//   - An OpenClawPluginToolFactory function → stored as-is           (FUNCTION path)
+//
+// We must use the OBJECT path. When the function path is used, OpenClaw calls
+// factory(context) per-request (embedded agent) with OpenClawPluginToolContext
+// instead of tool args. Our async handlers then return a Promise (no .name),
+// causing all 36 tools to resolve with name=undefined → "tool name conflict"
+// spam → gateway crash. Using the object path makes factory = (_ctx) => tool,
+// so tool.name is always the correct string.
+interface PluginTool {
+  name: string;
+  execute: (
+    _id: string,
+    params: Record<string, unknown>
+  ) => Promise<{ content: Array<{ type: "text"; text: string }> }>;
+}
 interface OpenClawPluginApi {
-  registerTool: (handler: Function, options: { name: string }) => void;
+  registerTool: (tool: PluginTool, options?: { name?: string }) => void;
 }
 
 const plugin = {
@@ -77,9 +94,29 @@ const plugin = {
   name: "Goal Agent",
   description: "AI-powered goal and habit tracking agent tools",
   register(api: OpenClawPluginApi) {
-    // Register all tools
     for (const [name, handler] of Object.entries(allTools)) {
-      api.registerTool(handler as Function, { name });
+      api.registerTool({
+        name,
+        execute: async (
+          _id: string,
+          params: Record<string, unknown>
+        ) => {
+          const result = await (
+            handler as (args: Record<string, unknown>) => Promise<unknown>
+          )(params);
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  typeof result === "string"
+                    ? result
+                    : JSON.stringify(result),
+              },
+            ],
+          };
+        },
+      });
     }
   },
 };
