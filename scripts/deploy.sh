@@ -14,7 +14,8 @@
 #   1. Ensure uv is installed
 #   2. Sync Python deps (runtime only)
 #   3. Run Alembic migrations
-#   4. Reload the systemd service (zero-downtime via systemd)
+#   4. Build and install OpenClaw plugin (if openclaw + node are present)
+#   5. Reload the systemd service (zero-downtime via systemd)
 
 set -euo pipefail
 
@@ -54,7 +55,25 @@ fi
 step "Running database migrations…"
 uv run alembic upgrade head
 
-# ── 5. Install / refresh systemd unit ─────────────────────────────────────
+# ── 5. Build and install OpenClaw plugin ───────────────────────────────────
+PLUGIN_DIR="$ROOT/openclaw-plugin"
+OPENCLAW_MJS="$HOME/.openclaw/openclaw.mjs"
+
+if [[ ! -d "$PLUGIN_DIR" ]]; then
+  warn "openclaw-plugin directory not found – skipping plugin install."
+elif ! command -v node &>/dev/null; then
+  warn "node not found – skipping OpenClaw plugin install."
+elif [[ ! -f "$OPENCLAW_MJS" ]]; then
+  warn "OpenClaw not found at $OPENCLAW_MJS – skipping plugin install."
+else
+  step "Building OpenClaw plugin…"
+  (cd "$PLUGIN_DIR" && npm install --silent && npm run build --silent)
+
+  step "Installing OpenClaw plugin (openclaw-goal-agent)…"
+  node "$OPENCLAW_MJS" plugins install --link "$PLUGIN_DIR"
+fi
+
+# ── 6. Install / refresh systemd unit ─────────────────────────────────────
 if [[ -f "$SYSTEMD_UNIT_SRC" ]]; then
   CURRENT_USER="$(id -un)"
   CURRENT_GROUP="$(id -gn)"
@@ -76,7 +95,7 @@ if [[ -f "$SYSTEMD_UNIT_SRC" ]]; then
   fi
 fi
 
-# ── 6. Restart / start the service ────────────────────────────────────────
+# ── 7. Restart / start the service ────────────────────────────────────────
 if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
   step "Reloading ${SERVICE_NAME}…"
   sudo systemctl reload-or-restart "$SERVICE_NAME"
@@ -89,7 +108,7 @@ else
   warn "  uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop"
 fi
 
-# ── 7. Setup cron jobs ──────────────────────────────────────────────────────
+# ── 8. Setup cron jobs ──────────────────────────────────────────────────────
 step "Setting up cron jobs…"
 
 # Detect uv binary (supports system-wide or user-local installation)
