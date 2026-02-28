@@ -1,191 +1,209 @@
-# OpenClaw 插件部署指南
+# Deploying Goal Agent with OpenClaw Integration
 
-本文档记录 Goal Agent OpenClaw 插件的完整部署步骤，包括手动修改的内容。
+This guide covers the complete setup of Goal Agent on a Raspberry Pi with OpenClaw plugin integration. It also serves as a reference for day-to-day deployment updates.
 
-## 前提条件
+---
 
-- Node.js >= 18
-- OpenClaw 已安装并配置
-- Goal Agent API 可访问
+## Prerequisites
 
-## 快速安装
+| Requirement | Notes |
+|-------------|-------|
+| Raspberry Pi OS (Debian 12+) | aarch64 |
+| Python 3.12 | via `uv` |
+| [uv](https://docs.astral.sh/uv/) | installed by `setup.sh` |
+| MariaDB | `sudo apt install mariadb-server` |
+| Node.js ≥ 18 | `sudo apt install nodejs` |
+| [OpenClaw](https://openclaw.ai) | installed at `~/.openclaw/` |
+| Telegram bot tokens | best_pal bot + go_getter bot |
+| Kimi API key | `sk-…` from Moonshot AI |
+| GitHub PAT | for auto-committing reports |
 
-```bash
-cd /path/to/goal-agent
-./scripts/install-openclaw-plugin.sh [API_BASE_URL] [TELEGRAM_CHAT_ID]
-```
+---
 
-## 手动部署步骤
+## First-Time Setup
 
-### 1. 构建插件
-
-```bash
-cd openclaw-plugin
-npm install
-npm run build
-```
-
-### 2. 复制到 OpenClaw 扩展目录
+### 1. Clone and bootstrap
 
 ```bash
-mkdir -p ~/.openclaw/extensions/goal-agent
-cp -r openclaw-plugin/dist ~/.openclaw/extensions/goal-agent/
-cp openclaw-plugin/openclaw.plugin.json ~/.openclaw/extensions/goal-agent/
-cp openclaw-plugin/package.json ~/.openclaw/extensions/goal-agent/
+git clone https://github.com/rushwing/goal-agent.git
+cd goal-agent
+./scripts/setup.sh --dev        # installs uv, creates .venv, copies .env.example → .env
 ```
 
-### 3. 安装依赖
+### 2. Configure `.env`
 
 ```bash
-cd ~/.openclaw/extensions/goal-agent
-npm install axios
+$EDITOR .env
 ```
 
-### 4. 创建插件配置文件
+Key values to fill in:
 
-创建 `~/.openclaw/extensions/goal-agent/config.json`:
+```env
+DATABASE_URL=mysql+aiomysql://planner:yourpassword@localhost:3306/goal_agent
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=goal_agent
+DB_USER=planner
+DB_PASSWORD=yourpassword
+
+KIMI_API_KEY=sk-...
+TELEGRAM_BEST_PAL_BOT_TOKEN=123456:ABCdef...
+TELEGRAM_GO_GETTER_BOT_TOKEN=789012:GHIjkl...
+TELEGRAM_GROUP_CHAT_ID=-1001234567890
+GITHUB_PAT=ghp_...
+GITHUB_DATA_REPO=username/goal-agent-data
+ADMIN_CHAT_IDS=123456789
+```
+
+### 3. Initialise the database
+
+Creates the MariaDB database and user, then runs all Alembic migrations:
+
+```bash
+# Root with unix_socket auth (Raspberry Pi OS default — no password needed)
+./scripts/db_init.sh
+
+# Or if your root account has a password
+./scripts/db_init.sh -p <root_password>
+```
+
+### 4. Install the systemd service (one-time, requires sudo)
+
+`deploy.sh` skips this step when not running as root. Run it once manually:
+
+```bash
+ROOT=$(pwd)
+USER=$(id -un)
+GROUP=$(id -gn)
+sudo bash -c "
+  sed -e 's|/home/pi/goal-agent|$ROOT|g' \
+      -e 's|User=pi|User=$USER|g' \
+      -e 's|Group=pi|Group=$GROUP|g' \
+      $ROOT/systemd/goal-agent.service > /etc/systemd/system/goal-agent.service
+  systemctl daemon-reload
+  systemctl enable goal-agent
+"
+```
+
+### 5. Run the first deploy
+
+```bash
+./scripts/deploy.sh
+```
+
+This will:
+1. Sync Python dependencies
+2. Run any pending Alembic migrations
+3. Build and install the OpenClaw plugin (see below)
+4. Start the systemd service
+
+---
+
+## OpenClaw Plugin Integration
+
+The plugin is built and installed automatically by `deploy.sh` (step 5). No manual steps are needed on subsequent deploys.
+
+### What `deploy.sh` does
+
+```
+► Building OpenClaw plugin…        # npm install + npm run build
+► Installing OpenClaw plugin…      # node ~/.openclaw/openclaw.mjs plugins install --link
+```
+
+### Configure the plugin in OpenClaw
+
+The plugin reads its config from the `PLUGIN_CONFIG` environment variable injected by OpenClaw. Set it via the OpenClaw UI or config file.
+
+**Best Pal config** (parent — accesses wizard, plan, report, tracks tools):
 
 ```json
 {
-  "apiBaseUrl": "http://192.168.1.100:8000/api/v1",
-  "telegramChatId": "YOUR_TELEGRAM_CHAT_ID"
+  "apiBaseUrl": "http://localhost:8000/api/v1",
+  "telegramChatId": "111111111"
 }
 ```
 
-### 5. 更新 OpenClaw 配置
-
-编辑 `~/.openclaw/openclaw.json`，添加插件配置：
+**Go Getter config** (child — accesses check-in tools):
 
 ```json
 {
-  "plugins": {
-    "allow": [
-      "telegram",
-      "whatsapp",
-      "openclaw-goal-agent"
-    ],
-    "entries": {
-      "telegram": {
-        "enabled": true
-      },
-      "whatsapp": {
-        "enabled": true
-      },
-      "openclaw-goal-agent": {
-        "enabled": true,
-        "config": {
-          "apiBaseUrl": "http://192.168.1.100:8000/api/v1",
-          "telegramChatId": "YOUR_TELEGRAM_CHAT_ID"
-        }
-      }
-    }
-  }
+  "apiBaseUrl": "http://localhost:8000/api/v1",
+  "telegramChatId": "222222222"
 }
 ```
 
-### 6. 重启 OpenClaw
+The `telegramChatId` is used as the `X-Telegram-Chat-Id` header, which the server uses to resolve the user's role (`admin`, `best_pal`, or `go_getter`).
+
+### Verify the plugin is loaded
 
 ```bash
-openclaw gateway restart
+node ~/.openclaw/openclaw.mjs plugins list
 ```
 
-### 7. 验证安装
+Expected output includes `openclaw-goal-agent`.
+
+### Available tools by role
+
+| Role | Tools |
+|------|-------|
+| `admin` | add/update/remove/list go_getters & best_pals |
+| `best_pal` / `admin` | create/update/delete targets, generate plans, wizard, reports, tracks |
+| `go_getter` | list today/week tasks, checkin, skip, progress |
+
+Full tool list: see [README.md → MCP Tools](../README.md#mcp-tools).
+
+---
+
+## Day-to-Day Deployment Updates
+
+After every `git pull`:
 
 ```bash
-openclaw plugins list | grep goal-agent
+git pull origin main
+./scripts/deploy.sh
 ```
 
-应显示：`Goal Agent | openclaw-goal-agent | loaded`
+`deploy.sh` is fully idempotent — safe to re-run at any time:
 
-## 关键修改记录
+| Step | Behaviour on re-run |
+|------|-------------------|
+| uv sync | no-op if deps unchanged |
+| Alembic migrate | only runs unapplied migrations |
+| OpenClaw plugin build | rebuilds from source |
+| OpenClaw plugin install | re-registers (non-fatal if already registered) |
+| systemd reload | `reload-or-restart` — brief or zero downtime |
+| cron job | skips if already installed |
 
-### 1. openclaw.plugin.json 修改
+---
 
-- **`config` → `configSchema`**: OpenClaw 要求使用 `configSchema` 字段
-- **添加 `id` 字段**: 设置为 `openclaw-goal-agent`
-- **使用标准 JSON Schema 格式**:
-  ```json
-  {
-    "type": "object",
-    "additionalProperties": false,
-    "required": ["apiBaseUrl", "telegramChatId"],
-    "properties": { ... }
-  }
-  ```
+## Troubleshooting
 
-### 2. package.json 修改
+### `ERROR 1698: Access denied for user 'root'`
 
-- **添加 `openclaw` 字段**:
-  ```json
-  {
-    "openclaw": {
-      "id": "openclaw-goal-agent",
-      "extensions": ["./dist/index.js"]
-    }
-  }
-  ```
+Raspberry Pi OS MariaDB root uses unix_socket auth. `db_init.sh` handles this automatically — use it instead of running `mysql -u root` directly.
 
-### 3. dist/index.js 修改
+### `plugin manifest requires id`
 
-原代码在模块加载时立即读取 `PLUGIN_CONFIG` 环境变量，但 OpenClaw 在加载时没有注入该变量。修改为：
+Add `"id": "openclaw-goal-agent"` to `openclaw.plugin.json`. This is already present in the repo; ensure you've pulled the latest code and rebuilt (`npm run build`).
 
-1. 优先尝试 `PLUGIN_CONFIG` 环境变量
-2. 回退到读取 `config.json` 文件
-3. 导出符合 OpenClaw 插件接口的对象：
-   ```javascript
-   const plugin = {
-     id: "openclaw-goal-agent",
-     name: "Goal Agent",
-     description: "...",
-     register(api) {
-       for (const [name, handler] of Object.entries(allTools)) {
-         api.registerTool(handler, { name });
-       }
-     }
-   };
-   module.exports = plugin;
-   ```
+### `package.json missing openclaw.extensions`
 
-### 4. pyproject.toml 修改
+OpenClaw 2026.1.30+ requires the `openclaw` field in `package.json`. Already present in the repo — ensure you've pulled latest.
 
-添加 uv 依赖组：
-```toml
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "pytest-asyncio>=1.3.0",
-]
+### `Failed to load environment files: No such file or directory`
+
+The systemd unit is using wrong paths (hardcoded for user `pi`). Re-run the one-time systemd install command in step 4 above.
+
+### Service fails to start
+
+```bash
+journalctl -u goal-agent -n 50 --no-pager
 ```
 
-## 故障排除
+Common causes: missing `.env`, database not running, wrong `DATABASE_URL`.
 
-### 错误: "PLUGIN_CONFIG environment variable is required"
+### Plugin not showing tools in OpenClaw
 
-**原因**: OpenClaw 未注入配置环境变量
-
-**解决**: 创建 `~/.openclaw/extensions/goal-agent/config.json` 文件
-
-### 错误: "plugin manifest requires id"
-
-**原因**: `openclaw.plugin.json` 缺少 `id` 字段
-
-**解决**: 添加 `"id": "openclaw-goal-agent"`
-
-### 错误: "plugin manifest requires configSchema"
-
-**原因**: 使用了 `config` 而不是 `configSchema`
-
-**解决**: 将 `config` 重命名为 `configSchema`
-
-### 错误: "missing register/activate export"
-
-**原因**: 插件未导出正确的接口
-
-**解决**: 确保 `index.js` 导出包含 `register(api)` 方法的对象
-
-## 相关文件
-
-- `openclaw-plugin/openclaw.plugin.json` - 插件清单
-- `openclaw-plugin/package.json` - NPM 包配置
-- `scripts/install-openclaw-plugin.sh` - 安装脚本
-- `docs/openclaw-plugin-deployment.md` - 本文档
+- Check `PLUGIN_CONFIG` is set and valid JSON
+- Check the API is reachable: `curl http://localhost:8000/health`
+- Check the `telegramChatId` matches a registered user (`admin`, `best_pal`, or `go_getter`)
