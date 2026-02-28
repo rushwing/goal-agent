@@ -4,6 +4,7 @@
   "description": "OpenClaw plugin for Goal Agent",
   "main": "dist/index.js",
   "openclaw": {
+    "id": "goal-agent",
     "extensions": ["./dist/index.js"]
   },
   "scripts": {
