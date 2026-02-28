@@ -82,17 +82,40 @@ else
     # (first entry) and can be overridden per-user via OpenClaw's PLUGIN_CONFIG.
     APP_PORT="${APP_PORT:-8000}"
     ADMIN_CHAT_ID="${ADMIN_CHAT_IDS%%,*}"   # first entry only
+
+    # ── Patch openclaw.json (canonical config location) ──────────────────────
+    # OpenClaw injects plugins.entries.<id>.config as PLUGIN_CONFIG at runtime.
+    # This is the authoritative place; config.json below is only a fallback.
+    OPENCLAW_JSON="$HOME/.openclaw/openclaw.json"
+    if [[ -f "$OPENCLAW_JSON" ]]; then
+      step "Patching openclaw.json plugin config…"
+      python3 - "$OPENCLAW_JSON" "${APP_PORT}" "${ADMIN_CHAT_ID}" <<'PYEOF'
+import json, sys
+path, port, chat_id = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path) as f:
+    cfg = json.load(f)
+entry = cfg.setdefault("plugins", {}).setdefault("entries", {}).setdefault("openclaw-goal-agent", {})
+entry["config"] = {
+    "apiBaseUrl": f"http://localhost:{port}/api/v1",
+    "telegramChatId": chat_id,
+}
+with open(path, "w") as f:
+    json.dump(cfg, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+print(f"  apiBaseUrl=http://localhost:{port}/api/v1  telegramChatId={chat_id}")
+PYEOF
+    fi
+
+    # ── Write config.json as fallback (used when PLUGIN_CONFIG env var absent) ─
     CONFIG_FILE="$PLUGIN_DIR/config.json"
     if [[ ! -f "$CONFIG_FILE" ]] || [[ ".env" -nt "$CONFIG_FILE" ]]; then
-      step "Writing plugin config.json (apiBaseUrl + default telegramChatId)…"
+      step "Writing plugin config.json (fallback)…"
       cat > "$CONFIG_FILE" <<JSON
 {
   "apiBaseUrl": "http://localhost:${APP_PORT}/api/v1",
   "telegramChatId": "${ADMIN_CHAT_ID}"
 }
 JSON
-      warn "config.json written with telegramChatId=${ADMIN_CHAT_ID}."
-      warn "Override per-user via OpenClaw's PLUGIN_CONFIG environment variable."
     fi
 
     # Uninstall any existing copy first (clears duplicate entries from old installs).
