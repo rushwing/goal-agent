@@ -14,7 +14,8 @@
 #   1. Ensure uv is installed
 #   2. Sync Python deps (runtime only)
 #   3. Run Alembic migrations
-#   4. Reload the systemd service (zero-downtime via systemd)
+#   4. Build and install OpenClaw plugin (if openclaw + node are present)
+#   5. Reload the systemd service (zero-downtime via systemd)
 
 set -euo pipefail
 
@@ -50,11 +51,60 @@ if [[ ! -f ".env" ]]; then
   cp .env.example .env
 fi
 
+# Load .env into the current shell so subsequent steps can read its values
+# (e.g. APP_PORT, ADMIN_CHAT_IDS for plugin config.json generation).
+# shellcheck disable=SC1091
+set -o allexport
+source .env
+set +o allexport
+
 # ── 4. Run migrations ──────────────────────────────────────────────────────
 step "Running database migrations…"
 uv run alembic upgrade head
 
-# ── 5. Install / refresh systemd unit ─────────────────────────────────────
+# ── 5. Build and install OpenClaw plugin ───────────────────────────────────
+PLUGIN_DIR="$ROOT/openclaw-plugin"
+OPENCLAW_MJS="$HOME/.openclaw/openclaw.mjs"
+
+if [[ ! -d "$PLUGIN_DIR" ]]; then
+  warn "openclaw-plugin directory not found – skipping plugin install."
+elif ! command -v node &>/dev/null; then
+  warn "node not found – skipping OpenClaw plugin install."
+elif [[ ! -f "$OPENCLAW_MJS" ]]; then
+  warn "OpenClaw not found at $OPENCLAW_MJS – skipping plugin install."
+else
+  # P2 fix: build is best-effort — network/npm failure must not abort service deploy
+  step "Building OpenClaw plugin…"
+  if (cd "$PLUGIN_DIR" && npm install --silent && npm run build --silent); then
+
+    # P1 fix: write config.json so plugin works without manual PLUGIN_CONFIG setup.
+    # apiBaseUrl is derived from .env; telegramChatId seeds from ADMIN_CHAT_IDS
+    # (first entry) and can be overridden per-user via OpenClaw's PLUGIN_CONFIG.
+    APP_PORT="${APP_PORT:-8000}"
+    ADMIN_CHAT_ID="${ADMIN_CHAT_IDS%%,*}"   # first entry only
+    CONFIG_FILE="$PLUGIN_DIR/config.json"
+    if [[ ! -f "$CONFIG_FILE" ]] || [[ ".env" -nt "$CONFIG_FILE" ]]; then
+      step "Writing plugin config.json (apiBaseUrl + default telegramChatId)…"
+      cat > "$CONFIG_FILE" <<JSON
+{
+  "apiBaseUrl": "http://localhost:${APP_PORT}/api/v1",
+  "telegramChatId": "${ADMIN_CHAT_ID}"
+}
+JSON
+      warn "config.json written with telegramChatId=${ADMIN_CHAT_ID}."
+      warn "Override per-user via OpenClaw's PLUGIN_CONFIG environment variable."
+    fi
+
+    step "Installing OpenClaw plugin (openclaw-goal-agent)…"
+    # Suppress non-zero exit: "already registered" must not abort the deploy
+    node "$OPENCLAW_MJS" plugins install --link "$PLUGIN_DIR" \
+      || warn "OpenClaw plugin install returned non-zero (may already be registered) — continuing."
+  else
+    warn "OpenClaw plugin build failed — skipping plugin install. Service deploy continues."
+  fi
+fi
+
+# ── 6. Install / refresh systemd unit ─────────────────────────────────────
 if [[ -f "$SYSTEMD_UNIT_SRC" ]]; then
   CURRENT_USER="$(id -un)"
   CURRENT_GROUP="$(id -gn)"
@@ -76,7 +126,7 @@ if [[ -f "$SYSTEMD_UNIT_SRC" ]]; then
   fi
 fi
 
-# ── 6. Restart / start the service ────────────────────────────────────────
+# ── 7. Restart / start the service ────────────────────────────────────────
 if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
   step "Reloading ${SERVICE_NAME}…"
   sudo systemctl reload-or-restart "$SERVICE_NAME"
@@ -89,7 +139,7 @@ else
   warn "  uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --loop uvloop"
 fi
 
-# ── 7. Setup cron jobs ──────────────────────────────────────────────────────
+# ── 8. Setup cron jobs ──────────────────────────────────────────────────────
 step "Setting up cron jobs…"
 
 # Detect uv binary (supports system-wide or user-local installation)
@@ -111,3 +161,19 @@ fi
 
 echo ""
 echo -e "${GREEN}✓ Deploy complete.${NC}"
+
+# ── Post-deploy: warn if .env still contains placeholder values ─────────────
+_has_placeholder() {
+  # Match exact placeholder values from .env.example.
+  # Anchored patterns (=$) prevent false positives on key names that contain
+  # the substring (e.g. DB_PASSWORD=real_secret must not trigger =password$).
+  grep -qE \
+    'sk-your-key-here|123456:ABCdef|789012:GHIjkl|ghp_your_token_here|change-me|=password$|://[^:]+:password@|=-1001234567890$' \
+    .env 2>/dev/null
+}
+if _has_placeholder; then
+  echo ""
+  warn "⚠  .env still contains placeholder values."
+  warn "   Follow the setup guide to fill in your secrets:"
+  warn "   docs/env-setup.md"
+fi

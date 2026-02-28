@@ -86,25 +86,29 @@ goal-agent/
 
 - Python 3.12, [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - MariaDB / MySQL (or use Docker Compose)
+- Node.js ≥ 18 + [OpenClaw](https://openclaw.ai) (for plugin integration)
 - Telegram bot tokens (best_pal + go_getter), Kimi API key, GitHub PAT
 
 ### 1 – Bootstrap
 
 ```bash
-git clone https://github.com/your-org/goal-agent.git
+git clone https://github.com/rushwing/goal-agent.git
 cd goal-agent
-./scripts/setup.sh --dev        # installs uv, creates .venv, copies .env
+./scripts/setup.sh --dev        # installs uv, creates .venv, copies .env.example → .env
 ```
 
-Edit `.env` with your secrets (see [Environment Variables](#environment-variables)).
+Edit `.env` with your secrets — see [`docs/env-setup.md`](docs/env-setup.md) for a step-by-step guide (bot tokens, API keys, chat IDs, HMAC secret).
 
 ### 2 – Database
 
 ```bash
-# Native MariaDB
-./scripts/migrate.sh            # alembic upgrade head
+# Native MariaDB — creates DB + user, then runs migrations (Raspberry Pi OS socket auth supported)
+./scripts/db_init.sh
 
-# Or Docker Compose (starts MariaDB + runs migrations)
+# Or with explicit root password
+./scripts/db_init.sh -p <root_password>
+
+# Or Docker Compose
 docker compose --profile migrate up migrate
 ```
 
@@ -128,24 +132,44 @@ MCP tools: `http://localhost:8000/mcp`
 | Script | Purpose |
 |--------|---------|
 | `./scripts/setup.sh [--dev]` | Install uv, sync deps, copy `.env` |
+| `./scripts/db_init.sh [-p pw]` | First-time: create MariaDB DB + user, then migrate |
 | `./scripts/dev.sh` | Hot-reload dev server |
 | `./scripts/migrate.sh [cmd]` | Alembic wrapper (default: `upgrade head`) |
 | `./scripts/test.sh [--cov]` | Run pytest (SQLite in-memory, no MariaDB needed) |
 | `./scripts/lint.sh [--fix]` | ruff check + format |
-| `./scripts/deploy.sh` | Full Pi deploy: sync → migrate → `systemctl reload` |
+| `./scripts/deploy.sh` | Full Pi deploy: sync → migrate → build+install OpenClaw plugin → `systemctl reload` |
+| `./scripts/backup.sh` | Dump MariaDB + `.env` to `backups/`; auto-prune after 7 days |
 
 ---
 
 ## Deployment on Raspberry Pi 5
 
-### Native (recommended)
+> Full guide (first-time setup, OpenClaw integration, troubleshooting): [`docs/openclaw-plugin-deployment.md`](docs/openclaw-plugin-deployment.md)
+
+### First-time setup
 
 ```bash
-# On the Pi, after git pull:
-./scripts/deploy.sh
+./scripts/setup.sh --dev        # bootstrap Python env
+$EDITOR .env                    # fill in secrets
+./scripts/db_init.sh            # create DB + user + run migrations
+
+# Install systemd service (one-time, needs sudo)
+ROOT=$(pwd); U=$(id -un); G=$(id -gn)
+sudo bash -c "sed -e 's|/home/pi/goal-agent|$ROOT|g' -e 's|User=pi|User=$U|g' -e 's|Group=pi|Group=$G|g' $ROOT/systemd/goal-agent.service > /etc/systemd/system/goal-agent.service && systemctl daemon-reload && systemctl enable goal-agent"
+
+./scripts/deploy.sh             # sync deps + migrate + install OpenClaw plugin + start service
 ```
 
-This syncs deps, runs migrations, installs the systemd unit, and reloads the service. MariaDB tuning is in `systemd/99-planner.cnf`:
+### Day-to-day updates
+
+```bash
+git pull origin main
+./scripts/deploy.sh             # idempotent — safe to re-run every time
+```
+
+`deploy.sh` automatically rebuilds and re-registers the OpenClaw plugin on every run.
+
+### MariaDB tuning (`systemd/99-planner.cnf`)
 
 ```ini
 innodb_buffer_pool_size = 128M
@@ -157,7 +181,7 @@ collation-server        = utf8mb4_unicode_ci
 ### Docker Compose (alternative)
 
 ```bash
-cp .env.example .env            # fill in secrets
+cp -n .env.example .env         # copy only if .env does not already exist
 docker compose up -d            # starts api + db
 docker compose --profile migrate up migrate   # run migrations once
 docker compose logs -f api      # follow logs
@@ -253,22 +277,28 @@ mood_bonus:         1 → 0.8 · 2 → 0.9 · 3 → 1.0 · 4 → 1.1 · 5 → 1.
 
 The TypeScript plugin lives in `openclaw-plugin/`. It calls FastAPI REST endpoints directly (OpenClaw does not speak MCP natively).
 
-```bash
-cd openclaw-plugin
-npm install
-npm run build
+> Full deployment guide: [`docs/openclaw-plugin-deployment.md`](docs/openclaw-plugin-deployment.md)
+
+### Installation (automated)
+
+`deploy.sh` builds and registers the plugin automatically on every deploy:
+
+```
+► Building OpenClaw plugin…        # npm install + npm run build (best-effort)
+► Writing plugin config.json…      # seeded from APP_PORT + ADMIN_CHAT_IDS in .env
+► Installing OpenClaw plugin…      # plugins install --link openclaw-plugin/
 ```
 
-Configure via environment variable:
+No manual steps needed after the first `./scripts/deploy.sh`. Build failures are non-fatal — a warning is printed and the service deploy continues.
+
+### Configuration
+
+`deploy.sh` auto-writes `openclaw-plugin/config.json` seeded from your `.env` (`APP_PORT` + first `ADMIN_CHAT_IDS` entry). This is used as a fallback when `PLUGIN_CONFIG` is not set in OpenClaw.
+
+For per-user role override, set `PLUGIN_CONFIG` in the OpenClaw UI:
 
 ```json
-PLUGIN_CONFIG='{"apiBaseUrl":"http://raspberry-pi-ip:8000/api/v1","telegramChatId":"123456789"}'
-```
-
-Optional HMAC signing (production):
-
-```json
-PLUGIN_CONFIG='{"apiBaseUrl":"...","telegramChatId":"...","hmacSecret":"your-shared-secret"}'
+{ "apiBaseUrl": "http://raspberry-pi-ip:8000/api/v1", "telegramChatId": "123456789" }
 ```
 
 Two configs are typical — one with a best pal's chat ID (accesses wizard, plan, report, tracks tools), one with a go getter's (accesses check-in tools). The server resolves the role from `X-Telegram-Chat-Id` automatically.

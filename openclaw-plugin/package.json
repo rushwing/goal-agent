@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "OpenClaw plugin for Goal Agent",
   "main": "dist/index.js",
+  "openclaw": {
+    "id": "openclaw-goal-agent",
+    "extensions": ["./dist/index.js"]
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
