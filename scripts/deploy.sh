@@ -95,10 +95,13 @@ JSON
       warn "Override per-user via OpenClaw's PLUGIN_CONFIG environment variable."
     fi
 
+    # Uninstall any existing copy first (clears duplicate entries from old installs).
+    # Non-fatal: silently succeeds whether the plugin was registered or not.
+    node "$OPENCLAW_MJS" plugins uninstall openclaw-goal-agent 2>/dev/null || true
+
     step "Installing OpenClaw plugin (openclaw-goal-agent)…"
-    # Suppress non-zero exit: "already registered" must not abort the deploy
     node "$OPENCLAW_MJS" plugins install --link "$PLUGIN_DIR" \
-      || warn "OpenClaw plugin install returned non-zero (may already be registered) — continuing."
+      || warn "OpenClaw plugin install returned non-zero — continuing."
   else
     warn "OpenClaw plugin build failed — skipping plugin install. Service deploy continues."
   fi
