@@ -70,7 +70,10 @@ else
   (cd "$PLUGIN_DIR" && npm install --silent && npm run build --silent)
 
   step "Installing OpenClaw plugin (openclaw-goal-agent)…"
-  node "$OPENCLAW_MJS" plugins install --link "$PLUGIN_DIR"
+  # --link is idempotent on update; suppress non-zero exit so a
+  # "already installed" error from OpenClaw doesn't abort the deploy
+  node "$OPENCLAW_MJS" plugins install --link "$PLUGIN_DIR" \
+    || warn "OpenClaw plugin install returned non-zero (may already be registered) — continuing."
 fi
 
 # ── 6. Install / refresh systemd unit ─────────────────────────────────────
