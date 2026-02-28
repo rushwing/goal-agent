@@ -66,14 +66,35 @@ elif ! command -v node &>/dev/null; then
 elif [[ ! -f "$OPENCLAW_MJS" ]]; then
   warn "OpenClaw not found at $OPENCLAW_MJS – skipping plugin install."
 else
+  # P2 fix: build is best-effort — network/npm failure must not abort service deploy
   step "Building OpenClaw plugin…"
-  (cd "$PLUGIN_DIR" && npm install --silent && npm run build --silent)
+  if (cd "$PLUGIN_DIR" && npm install --silent && npm run build --silent); then
 
-  step "Installing OpenClaw plugin (openclaw-goal-agent)…"
-  # --link is idempotent on update; suppress non-zero exit so a
-  # "already installed" error from OpenClaw doesn't abort the deploy
-  node "$OPENCLAW_MJS" plugins install --link "$PLUGIN_DIR" \
-    || warn "OpenClaw plugin install returned non-zero (may already be registered) — continuing."
+    # P1 fix: write config.json so plugin works without manual PLUGIN_CONFIG setup.
+    # apiBaseUrl is derived from .env; telegramChatId seeds from ADMIN_CHAT_IDS
+    # (first entry) and can be overridden per-user via OpenClaw's PLUGIN_CONFIG.
+    APP_PORT="${APP_PORT:-8000}"
+    ADMIN_CHAT_ID="${ADMIN_CHAT_IDS%%,*}"   # first entry only
+    CONFIG_FILE="$PLUGIN_DIR/config.json"
+    if [[ ! -f "$CONFIG_FILE" ]] || [[ ".env" -nt "$CONFIG_FILE" ]]; then
+      step "Writing plugin config.json (apiBaseUrl + default telegramChatId)…"
+      cat > "$CONFIG_FILE" <<JSON
+{
+  "apiBaseUrl": "http://localhost:${APP_PORT}/api/v1",
+  "telegramChatId": "${ADMIN_CHAT_ID}"
+}
+JSON
+      warn "config.json written with telegramChatId=${ADMIN_CHAT_ID}."
+      warn "Override per-user via OpenClaw's PLUGIN_CONFIG environment variable."
+    fi
+
+    step "Installing OpenClaw plugin (openclaw-goal-agent)…"
+    # Suppress non-zero exit: "already registered" must not abort the deploy
+    node "$OPENCLAW_MJS" plugins install --link "$PLUGIN_DIR" \
+      || warn "OpenClaw plugin install returned non-zero (may already be registered) — continuing."
+  else
+    warn "OpenClaw plugin build failed — skipping plugin install. Service deploy continues."
+  fi
 fi
 
 # ── 6. Install / refresh systemd unit ─────────────────────────────────────

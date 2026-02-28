@@ -84,4 +84,7 @@ const plugin = {
   },
 };
 
-export default plugin;
+// tsconfig uses module:commonjs — use module.exports so the top-level
+// `register` key is directly accessible when OpenClaw does require(entry).
+// `export default` would compile to exports.default which OpenClaw won't find.
+module.exports = plugin;

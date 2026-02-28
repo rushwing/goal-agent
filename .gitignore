@@ -198,6 +198,7 @@ cython_debug/
 # Node (openclaw-plugin)
 openclaw-plugin/node_modules/
 openclaw-plugin/dist/
+openclaw-plugin/config.json
 
 # PyPI configuration file
 .pypirc
