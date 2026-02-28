@@ -95,10 +95,15 @@ else
 JSON
     fi
 
-    # ── Clean up legacy non-linked install dir ────────────────────────────────
-    rm -rf "$HOME/.openclaw/extensions/goal-agent"
+    # ── Clean up any prior extension registrations (copy or symlink) ────────────
+    # OpenClaw scans ~/.openclaw/extensions/ AND plugins.load.paths at startup.
+    # If the plugin appears in BOTH locations it loads twice → 36 tool-name
+    # conflicts → gateway crash.  Remove both possible extension paths so the
+    # plugin is loaded only from load.paths (the source tree).
+    rm -rf "$HOME/.openclaw/extensions/goal-agent"           # legacy name
+    rm -rf "$HOME/.openclaw/extensions/openclaw-goal-agent"  # copy or --link symlink
 
-    # ── Patch openclaw.json directly (bypass plugins install --link) ──────────
+    # ── Patch openclaw.json directly (no CLI install) ─────────────────────────
     # OpenClaw plugin loading rules:
     #   load.paths  → actually loads the plugin JS file
     #   allow       → gates whether the plugin is active; MUST be present or
