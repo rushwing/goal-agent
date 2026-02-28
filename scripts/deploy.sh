@@ -99,21 +99,24 @@ JSON
     rm -rf "$HOME/.openclaw/extensions/goal-agent"
 
     # ── Patch openclaw.json directly (bypass plugins install --link) ──────────
-    # `plugins install --link` adds the plugin to plugins.allow, which causes
-    # OpenClaw to load it a second time via plugins.installs on top of
-    # plugins.load.paths — producing 36 tool-name conflicts and a gateway crash.
-    # Removing from load.paths instead (previous attempt) caused "plugin not found"
-    # because allow referenced a plugin with no load source.
+    # OpenClaw plugin loading rules:
+    #   load.paths  → actually loads the plugin JS file
+    #   allow       → gates whether the plugin is active; MUST be present or
+    #                 the entry is "disabled (not in allowlist)" warning
+    #   installs    → if plugin is in BOTH allow AND installs, OpenClaw loads
+    #                 it a second time → 36 tool-name conflicts → gateway crash
     #
-    # Confirmed working state:
-    #   load.paths: [plugin_dir]          ← sole load mechanism
-    #   allow:      [telegram, whatsapp]  ← no openclaw-goal-agent
+    # Target state:
+    #   load.paths: [plugin_dir]                           ← file load source
+    #   allow:      [..., "openclaw-goal-agent"]           ← must be present
+    #   installs:   (no openclaw-goal-agent entry)         ← removed; prevents double load
     #   entries:    { openclaw-goal-agent: { enabled, config } }
     #
     # Patcher tasks:
     #   1. Ensure plugin_dir is in load.paths
-    #   2. Remove openclaw-goal-agent from allow (allow + installs = double load)
-    #   3. Set entry config (apiBaseUrl + telegramChatId → injected as PLUGIN_CONFIG)
+    #   2. Ensure openclaw-goal-agent is in allow
+    #   3. Remove openclaw-goal-agent from installs (allow + installs = double load)
+    #   4. Set entry config (apiBaseUrl + telegramChatId → injected as PLUGIN_CONFIG)
     OPENCLAW_JSON="$HOME/.openclaw/openclaw.json"
     if [[ -f "$OPENCLAW_JSON" ]]; then
       step "Patching openclaw.json plugin registration…"
@@ -125,20 +128,26 @@ with open(path) as f:
 
 plugins = cfg.setdefault("plugins", {})
 
-# 1. Ensure plugin_dir is in load.paths (actual loading mechanism)
+# 1. Ensure plugin_dir is in load.paths (actual file-load mechanism)
 load_paths = plugins.setdefault("load", {}).setdefault("paths", [])
 if plugin_dir not in load_paths:
     load_paths.append(plugin_dir)
     print(f"  added {plugin_dir} to plugins.load.paths")
 
-# 2. Remove from allow — allow + installs triggers a second load (36 conflicts)
-allow = plugins.get("allow", [])
-if "openclaw-goal-agent" in allow:
-    allow.remove("openclaw-goal-agent")
-    plugins["allow"] = allow
-    print("  removed openclaw-goal-agent from plugins.allow (prevents double load)")
+# 2. Ensure openclaw-goal-agent is in allow (required or entry is "disabled")
+allow = plugins.setdefault("allow", [])
+if "openclaw-goal-agent" not in allow:
+    allow.append("openclaw-goal-agent")
+    print("  added openclaw-goal-agent to plugins.allow")
 
-# 3. Set entry config (injected as PLUGIN_CONFIG at runtime)
+# 3. Remove from installs — allow + installs triggers a second load (36 conflicts)
+installs = plugins.get("installs", {})
+if "openclaw-goal-agent" in installs:
+    del installs["openclaw-goal-agent"]
+    plugins["installs"] = installs
+    print("  removed openclaw-goal-agent from plugins.installs (prevents double load)")
+
+# 4. Set entry config (injected as PLUGIN_CONFIG at runtime)
 entry = plugins.setdefault("entries", {}).setdefault("openclaw-goal-agent", {})
 entry["enabled"] = True
 entry["config"] = {
