@@ -107,11 +107,14 @@ The plugin is built and installed automatically by `deploy.sh` (step 5). No manu
 ```json
 {
   "apiBaseUrl": "http://127.0.0.1:<APP_PORT>/api/v1",
-  "telegramChatId": "<first value in ADMIN_CHAT_IDS>"
+  "telegramChatId": "<first value in ADMIN_CHAT_IDS>",
+  "hmacSecret": "<HMAC_SECRET value from .env>"
 }
 ```
 
 It also patches `~/.openclaw/openclaw.json` to set the entry config under `plugins.entries.openclaw-goal-agent.config`. OpenClaw passes this as `api.pluginConfig` when it calls `plugin.register(api)` — this is the **primary** config source. The `config.json` file is the **fallback** when `api.pluginConfig` is absent. It is gitignored and must not be committed.
+
+`hmacSecret` is included when `HMAC_SECRET` is set in `.env`. It must match the server's `HMAC_SECRET` exactly — the plugin uses it to sign every request with `X-Request-Timestamp`, `X-Nonce`, and `X-Signature` headers.
 
 **For multi-user setups**, override per-user via the entry config in `~/.openclaw/openclaw.json` (under `plugins.entries.openclaw-goal-agent.config`):
 
@@ -120,7 +123,8 @@ It also patches `~/.openclaw/openclaw.json` to set the entry config under `plugi
 ```json
 {
   "apiBaseUrl": "http://127.0.0.1:8000/api/v1",
-  "telegramChatId": "111111111"
+  "telegramChatId": "111111111",
+  "hmacSecret": "<your HMAC_SECRET>"
 }
 ```
 
@@ -129,7 +133,8 @@ It also patches `~/.openclaw/openclaw.json` to set the entry config under `plugi
 ```json
 {
   "apiBaseUrl": "http://127.0.0.1:8000/api/v1",
-  "telegramChatId": "222222222"
+  "telegramChatId": "222222222",
+  "hmacSecret": "<your HMAC_SECRET>"
 }
 ```
 
