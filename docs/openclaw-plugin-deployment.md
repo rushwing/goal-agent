@@ -106,7 +106,7 @@ The plugin is built and installed automatically by `deploy.sh` (step 5). No manu
 
 ```json
 {
-  "apiBaseUrl": "http://localhost:<APP_PORT>/api/v1",
+  "apiBaseUrl": "http://127.0.0.1:<APP_PORT>/api/v1",
   "telegramChatId": "<first value in ADMIN_CHAT_IDS>"
 }
 ```
@@ -119,7 +119,7 @@ This `config.json` is used as a **fallback** when the `PLUGIN_CONFIG` environmen
 
 ```json
 {
-  "apiBaseUrl": "http://localhost:8000/api/v1",
+  "apiBaseUrl": "http://127.0.0.1:8000/api/v1",
   "telegramChatId": "111111111"
 }
 ```
@@ -128,7 +128,7 @@ This `config.json` is used as a **fallback** when the `PLUGIN_CONFIG` environmen
 
 ```json
 {
-  "apiBaseUrl": "http://localhost:8000/api/v1",
+  "apiBaseUrl": "http://127.0.0.1:8000/api/v1",
   "telegramChatId": "222222222"
 }
 ```
@@ -206,7 +206,7 @@ Common causes: missing `.env`, database not running, wrong `DATABASE_URL`.
 
 ### Plugin not showing tools in OpenClaw
 
-- Check the API is reachable: `curl http://localhost:8000/health`
+- Check the API is reachable: `curl http://127.0.0.1:8000/health`
 - Check that `openclaw-plugin/config.json` exists (created by `deploy.sh`); or that `PLUGIN_CONFIG` is set and valid JSON in your OpenClaw profile
 - Check the `telegramChatId` in `config.json` / `PLUGIN_CONFIG` matches a registered user (`admin`, `best_pal`, or `go_getter`)
 
