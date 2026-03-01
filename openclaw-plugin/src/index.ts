@@ -4,11 +4,12 @@
  * OpenClaw loads this as a CommonJS module and calls exported tool functions.
  * Each tool function receives its arguments and returns a result.
  *
- * Config is injected via PLUGIN_CONFIG environment variable (JSON):
- *   { "apiBaseUrl": "http://pi:8000/api/v1", "telegramChatId": "123456789" }
+ * Config is injected by OpenClaw via api.pluginConfig (set in openclaw.json
+ * entries.<id>.config, or via the PLUGIN_CONFIG field in the OpenClaw UI):
+ *   { "apiBaseUrl": "http://127.0.0.1:8000/api/v1", "telegramChatId": "123456789" }
  *
- * If PLUGIN_CONFIG is not set, falls back to reading config.json from the
- * plugin directory.
+ * If api.pluginConfig is not set, falls back to reading config.json from the
+ * plugin directory (written by deploy.sh).
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -20,18 +21,13 @@ import { registerReportTools } from "./tools/report.tools";
 import { registerWizardTools } from "./tools/wizard.tools";
 import { registerTracksTools } from "./tools/tracks.tools";
 
-function loadConfig(): PluginConfig {
-  // First try PLUGIN_CONFIG env var (injected by OpenClaw)
-  const raw = process.env.PLUGIN_CONFIG;
-  if (raw) {
-    try {
-      return JSON.parse(raw) as PluginConfig;
-    } catch {
-      throw new Error("PLUGIN_CONFIG must be valid JSON");
-    }
+function loadConfig(pluginConfig?: unknown): PluginConfig {
+  // First try api.pluginConfig (injected by OpenClaw from openclaw.json entry config)
+  if (pluginConfig && typeof pluginConfig === "object") {
+    return pluginConfig as PluginConfig;
   }
 
-  // Fallback: try to read from config.json in plugin directory
+  // Fallback: read config.json written by deploy.sh
   const configPath = path.join(__dirname, "..", "config.json");
   if (fs.existsSync(configPath)) {
     try {
@@ -43,29 +39,9 @@ function loadConfig(): PluginConfig {
   }
 
   throw new Error(
-    "PLUGIN_CONFIG environment variable is required or config.json must exist"
+    "Plugin config is required: set it via openclaw.json entry config or create config.json"
   );
 }
-
-const config = loadConfig();
-const client = createClient(config);
-
-const adminTools = registerAdminTools(client);
-const planTools = registerPlanTools(client);
-const checkinTools = registerCheckinTools(client);
-const reportTools = registerReportTools(client);
-const wizardTools = registerWizardTools(client);
-const tracksTools = registerTracksTools(client);
-
-// Combine all tools
-const allTools = {
-  ...adminTools,
-  ...planTools,
-  ...checkinTools,
-  ...reportTools,
-  ...wizardTools,
-  ...tracksTools,
-};
 
 // Minimal OpenClaw plugin API shape needed for tool registration.
 // registerTool accepts either:
@@ -100,6 +76,8 @@ interface PluginTool {
   ) => Promise<{ content: Array<{ type: "text"; text: string }> }>;
 }
 interface OpenClawPluginApi {
+  // OpenClaw injects the entry config from openclaw.json as api.pluginConfig
+  pluginConfig?: unknown;
   registerTool: (tool: PluginTool, options?: { name?: string }) => void;
 }
 
@@ -108,6 +86,20 @@ const plugin = {
   name: "Goal Agent",
   description: "AI-powered goal and habit tracking agent tools",
   register(api: OpenClawPluginApi) {
+    // Config must be loaded here (not at module level) because api.pluginConfig
+    // is only available when register() is called by OpenClaw at runtime.
+    const config = loadConfig(api.pluginConfig);
+    const client = createClient(config);
+
+    const allTools = {
+      ...registerAdminTools(client),
+      ...registerPlanTools(client),
+      ...registerCheckinTools(client),
+      ...registerReportTools(client),
+      ...registerWizardTools(client),
+      ...registerTracksTools(client),
+    };
+
     for (const [name, handler] of Object.entries(allTools)) {
       api.registerTool({
         name,

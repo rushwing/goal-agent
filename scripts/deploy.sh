@@ -82,17 +82,28 @@ else
     # (first entry) and can be overridden per-user via OpenClaw's PLUGIN_CONFIG.
     APP_PORT="${APP_PORT:-8000}"
     ADMIN_CHAT_ID="${ADMIN_CHAT_IDS%%,*}"   # first entry only
+    HMAC_SECRET="${HMAC_SECRET:-}"          # empty = HMAC disabled (dev mode)
 
-    # ── Write config.json as fallback (used when PLUGIN_CONFIG env var absent) ─
+    # ── Write config.json as fallback (used when api.pluginConfig absent) ──────
     CONFIG_FILE="$PLUGIN_DIR/config.json"
     if [[ ! -f "$CONFIG_FILE" ]] || [[ ".env" -nt "$CONFIG_FILE" ]]; then
       step "Writing plugin config.json (fallback)…"
-      cat > "$CONFIG_FILE" <<JSON
+      if [[ -n "$HMAC_SECRET" ]]; then
+        cat > "$CONFIG_FILE" <<JSON
+{
+  "apiBaseUrl": "http://127.0.0.1:${APP_PORT}/api/v1",
+  "telegramChatId": "${ADMIN_CHAT_ID}",
+  "hmacSecret": "${HMAC_SECRET}"
+}
+JSON
+      else
+        cat > "$CONFIG_FILE" <<JSON
 {
   "apiBaseUrl": "http://127.0.0.1:${APP_PORT}/api/v1",
   "telegramChatId": "${ADMIN_CHAT_ID}"
 }
 JSON
+      fi
     fi
 
     # ── Clean up any prior extension registrations (copy or symlink) ────────────
@@ -121,13 +132,13 @@ JSON
     #   1. Ensure plugin_dir is in load.paths
     #   2. Ensure openclaw-goal-agent is in allow
     #   3. Remove openclaw-goal-agent from installs (allow + installs = double load)
-    #   4. Set entry config (apiBaseUrl + telegramChatId → injected as PLUGIN_CONFIG)
+    #   4. Set entry config (apiBaseUrl + telegramChatId + hmacSecret → api.pluginConfig)
     OPENCLAW_JSON="$HOME/.openclaw/openclaw.json"
     if [[ -f "$OPENCLAW_JSON" ]]; then
       step "Patching openclaw.json plugin registration…"
-      python3 - "$OPENCLAW_JSON" "${APP_PORT}" "${ADMIN_CHAT_ID}" "${PLUGIN_DIR}" <<'PYEOF'
+      python3 - "$OPENCLAW_JSON" "${APP_PORT}" "${ADMIN_CHAT_ID}" "${PLUGIN_DIR}" "${HMAC_SECRET}" <<'PYEOF'
 import json, sys
-path, port, chat_id, plugin_dir = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+path, port, chat_id, plugin_dir, hmac_secret = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 with open(path) as f:
     cfg = json.load(f)
 
@@ -152,18 +163,22 @@ if "openclaw-goal-agent" in installs:
     plugins["installs"] = installs
     print("  removed openclaw-goal-agent from plugins.installs (prevents double load)")
 
-# 4. Set entry config (injected as PLUGIN_CONFIG at runtime)
+# 4. Set entry config (injected as api.pluginConfig at runtime by OpenClaw)
 entry = plugins.setdefault("entries", {}).setdefault("openclaw-goal-agent", {})
 entry["enabled"] = True
-entry["config"] = {
+plugin_cfg = {
     "apiBaseUrl": f"http://127.0.0.1:{port}/api/v1",
     "telegramChatId": chat_id,
 }
+if hmac_secret:
+    plugin_cfg["hmacSecret"] = hmac_secret
+entry["config"] = plugin_cfg
 
 with open(path, "w") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write("\n")
-print(f"  apiBaseUrl=http://127.0.0.1:{port}/api/v1  telegramChatId={chat_id}")
+hmac_info = "  hmacSecret=***" if hmac_secret else "  hmacSecret=(none)"
+print(f"  apiBaseUrl=http://127.0.0.1:{port}/api/v1  telegramChatId={chat_id}{hmac_info}")
 PYEOF
     else
       warn "~/.openclaw/openclaw.json not found — skipping openclaw.json patch."

@@ -100,27 +100,31 @@ The plugin is built and installed automatically by `deploy.sh` (step 5). No manu
 
 > **Note**: The build step is best-effort. If `npm install` or `npm run build` fails (e.g. due to network issues), a warning is printed and the service deploy continues normally.
 
-### Plugin config (`config.json` vs `PLUGIN_CONFIG`)
+### Plugin config (`config.json` vs entry config)
 
 `deploy.sh` automatically writes `openclaw-plugin/config.json` the first time (or whenever `.env` is newer), seeded from your `.env`:
 
 ```json
 {
   "apiBaseUrl": "http://127.0.0.1:<APP_PORT>/api/v1",
-  "telegramChatId": "<first value in ADMIN_CHAT_IDS>"
+  "telegramChatId": "<first value in ADMIN_CHAT_IDS>",
+  "hmacSecret": "<HMAC_SECRET value from .env>"
 }
 ```
 
-This `config.json` is used as a **fallback** when the `PLUGIN_CONFIG` environment variable is not set. It is gitignored and must not be committed.
+It also patches `~/.openclaw/openclaw.json` to set the entry config under `plugins.entries.openclaw-goal-agent.config`. OpenClaw passes this as `api.pluginConfig` when it calls `plugin.register(api)` — this is the **primary** config source. The `config.json` file is the **fallback** when `api.pluginConfig` is absent. It is gitignored and must not be committed.
 
-**For multi-user setups**, override per-user via `PLUGIN_CONFIG` in the OpenClaw UI or config file:
+`hmacSecret` is included when `HMAC_SECRET` is set in `.env`. It must match the server's `HMAC_SECRET` exactly — the plugin uses it to sign every request with `X-Request-Timestamp`, `X-Nonce`, and `X-Signature` headers.
+
+**For multi-user setups**, override per-user via the entry config in `~/.openclaw/openclaw.json` (under `plugins.entries.openclaw-goal-agent.config`):
 
 **Best Pal config** (parent — accesses wizard, plan, report, tracks tools):
 
 ```json
 {
   "apiBaseUrl": "http://127.0.0.1:8000/api/v1",
-  "telegramChatId": "111111111"
+  "telegramChatId": "111111111",
+  "hmacSecret": "<your HMAC_SECRET>"
 }
 ```
 
@@ -129,7 +133,8 @@ This `config.json` is used as a **fallback** when the `PLUGIN_CONFIG` environmen
 ```json
 {
   "apiBaseUrl": "http://127.0.0.1:8000/api/v1",
-  "telegramChatId": "222222222"
+  "telegramChatId": "222222222",
+  "hmacSecret": "<your HMAC_SECRET>"
 }
 ```
 
@@ -207,9 +212,9 @@ Common causes: missing `.env`, database not running, wrong `DATABASE_URL`.
 ### Plugin not showing tools in OpenClaw
 
 - Check the API is reachable: `curl http://127.0.0.1:8000/health`
-- Check that `openclaw-plugin/config.json` exists (created by `deploy.sh`); or that `PLUGIN_CONFIG` is set and valid JSON in your OpenClaw profile
-- Check the `telegramChatId` in `config.json` / `PLUGIN_CONFIG` matches a registered user (`admin`, `best_pal`, or `go_getter`)
+- Check that `openclaw-plugin/config.json` exists (created by `deploy.sh`), or that `~/.openclaw/openclaw.json` has a valid `plugins.entries.openclaw-goal-agent.config` block
+- Check the `telegramChatId` matches a registered user (`admin`, `best_pal`, or `go_getter`)
 
 ### `config.json` has wrong `telegramChatId`
 
-`deploy.sh` seeds `config.json` with the first entry from `ADMIN_CHAT_IDS`. To use a different chat ID (e.g. for a go_getter user), set `PLUGIN_CONFIG` in the OpenClaw UI for that profile — it takes precedence over `config.json`.
+`deploy.sh` seeds `config.json` with the first entry from `ADMIN_CHAT_IDS`. To use a different chat ID (e.g. for a go_getter user), edit the `plugins.entries.openclaw-goal-agent.config` block in `~/.openclaw/openclaw.json` for that profile — it takes precedence over `config.json`.
