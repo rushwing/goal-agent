@@ -94,11 +94,13 @@ The plugin is built and installed automatically by `deploy.sh` (step 5). No manu
 
 ```
 ► Building OpenClaw plugin…        # npm install + npm run build (best-effort — failure does not abort deploy)
-► Writing plugin config.json…      # seeded from APP_PORT + ADMIN_CHAT_IDS in .env (only if missing or .env is newer)
-► Installing OpenClaw plugin…      # node ~/.openclaw/openclaw.mjs plugins install --link (non-fatal if already registered)
+► Writing plugin config.json…      # seeded from APP_PORT + ADMIN_CHAT_IDS + HMAC_SECRET in .env (only if missing or .env is newer)
+► Patching openclaw.json…          # sets load.paths, allow, entry config (apiBaseUrl + telegramChatId + hmacSecret)
 ```
 
 > **Note**: The build step is best-effort. If `npm install` or `npm run build` fails (e.g. due to network issues), a warning is printed and the service deploy continues normally.
+
+> **Note**: `deploy.sh` patches `openclaw.json` directly (no `plugins install` CLI call) to avoid double-loading the plugin. See [lessons learned](openclaw-plugin-lessons-learned.md#1-double-load--36-tool-name-conflicts--gateway-crash).
 
 ### Plugin config (`config.json` vs entry config)
 
@@ -218,3 +220,41 @@ Common causes: missing `.env`, database not running, wrong `DATABASE_URL`.
 ### `config.json` has wrong `telegramChatId`
 
 `deploy.sh` seeds `config.json` with the first entry from `ADMIN_CHAT_IDS`. To use a different chat ID (e.g. for a go_getter user), edit the `plugins.entries.openclaw-goal-agent.config` block in `~/.openclaw/openclaw.json` for that profile — it takes precedence over `config.json`.
+
+### 36 "tool name conflict" errors on every message → gateway crash
+
+Plugin is loaded twice — once from `plugins.load.paths` and once from `~/.openclaw/extensions/`. Remove the extensions entry:
+
+```bash
+rm -rf ~/.openclaw/extensions/goal-agent
+rm -rf ~/.openclaw/extensions/openclaw-goal-agent
+```
+
+Then redeploy (`./scripts/deploy.sh`). This is handled automatically by `deploy.sh` on every run.
+
+See [lessons learned #1](openclaw-plugin-lessons-learned.md#1-double-load--36-tool-name-conflicts--gateway-crash).
+
+### `Config invalid: must NOT have additional properties`
+
+The plugin's `configSchema` is missing, so OpenClaw's default schema rejects all custom fields. Ensure you're on the latest code (`git pull`) and rebuild (`./scripts/deploy.sh`).
+
+See [lessons learned #7](openclaw-plugin-lessons-learned.md#7-plugin-must-declare-configschema-or-openclaw-rejects-all-config-fields).
+
+### `401 Invalid request signature`
+
+The plugin config is missing `hmacSecret`. Regenerate:
+
+```bash
+touch .env   # force config.json + openclaw.json to be rewritten
+./scripts/deploy.sh
+```
+
+Verify that `HMAC_SECRET` in `.env` is not the placeholder (`change-me-to-a-random-secret`). Generate a real secret if needed:
+
+```bash
+NEW_SECRET=$(openssl rand -hex 32)
+sed -i "s|HMAC_SECRET=.*|HMAC_SECRET=${NEW_SECRET}|" .env
+./scripts/deploy.sh
+```
+
+See [lessons learned #6](openclaw-plugin-lessons-learned.md#6-hmacsecret-must-be-in-the-plugin-config-when-hmac_secret-is-set).
