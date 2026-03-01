@@ -89,7 +89,7 @@ else
       step "Writing plugin config.json (fallback)…"
       cat > "$CONFIG_FILE" <<JSON
 {
-  "apiBaseUrl": "http://localhost:${APP_PORT}/api/v1",
+  "apiBaseUrl": "http://127.0.0.1:${APP_PORT}/api/v1",
   "telegramChatId": "${ADMIN_CHAT_ID}"
 }
 JSON
@@ -156,14 +156,14 @@ if "openclaw-goal-agent" in installs:
 entry = plugins.setdefault("entries", {}).setdefault("openclaw-goal-agent", {})
 entry["enabled"] = True
 entry["config"] = {
-    "apiBaseUrl": f"http://localhost:{port}/api/v1",
+    "apiBaseUrl": f"http://127.0.0.1:{port}/api/v1",
     "telegramChatId": chat_id,
 }
 
 with open(path, "w") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write("\n")
-print(f"  apiBaseUrl=http://localhost:{port}/api/v1  telegramChatId={chat_id}")
+print(f"  apiBaseUrl=http://127.0.0.1:{port}/api/v1  telegramChatId={chat_id}")
 PYEOF
     else
       warn "~/.openclaw/openclaw.json not found — skipping openclaw.json patch."
