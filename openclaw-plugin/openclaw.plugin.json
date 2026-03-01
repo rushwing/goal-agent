@@ -16,6 +16,10 @@
       "telegramChatId": {
         "type": "string",
         "description": "Your Telegram Chat ID for role-based access"
+      },
+      "hmacSecret": {
+        "type": "string",
+        "description": "HMAC-SHA256 shared secret matching HMAC_SECRET in .env (optional; omit in dev mode)"
       }
     }
   },

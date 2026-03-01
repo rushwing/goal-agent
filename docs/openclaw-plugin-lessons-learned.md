@@ -150,7 +150,7 @@ The `hmacSecret` in the plugin config must be **identical** to the server's `HMA
 
 ---
 
-## 7. Plugin must declare `configSchema` or OpenClaw rejects all config fields
+## 7. `configSchema` must be in `openclaw.plugin.json`, not the JS export
 
 **Symptom**: OpenClaw refuses to start, logging:
 ```
@@ -159,46 +159,33 @@ Invalid config at ~/.openclaw/openclaw.json:
 Config invalid
 ```
 
-**Root cause**: When a plugin does not export a `configSchema`, OpenClaw uses `emptyPluginConfigSchema()` (defined in `src/plugins/config-schema.ts`):
-```typescript
-export function emptyPluginConfigSchema() {
-  return {
-    safeParse(value) {
-      if (Object.keys(value).length > 0)
-        return error("config must be empty");  // rejects any fields
-    },
-    jsonSchema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {},               // zero properties allowed
-    },
-  };
+**Root cause**: OpenClaw validates the entry config (`plugins.entries.<id>.config` in `openclaw.json`) against the `configSchema` field in **`openclaw.plugin.json`** (the manifest JSON file) — not from the JS module export. The validation happens in `loader.ts` at line 624 using `manifestRecord.configSchema`, which is populated by `manifest-registry.ts` reading the manifest file. The JS module isn't even loaded yet at this point.
+
+The load order is:
+1. `openclaw.plugin.json` is read → `configSchema` extracted
+2. `configSchema` used to validate the entry config in `openclaw.json` → **error raised here**
+3. JS module is `require()`d only if step 2 passes
+
+Any field in `openclaw.json` entry config that isn't listed in `openclaw.plugin.json`'s `configSchema.properties` will be rejected.
+
+**Fix**: Add all allowed fields to `openclaw.plugin.json`'s `configSchema`:
+```json
+{
+  "id": "openclaw-goal-agent",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["apiBaseUrl", "telegramChatId"],
+    "properties": {
+      "apiBaseUrl":     { "type": "string" },
+      "telegramChatId": { "type": "string" },
+      "hmacSecret":     { "type": "string" }
+    }
+  }
 }
 ```
 
-This default schema validates `plugins.entries.<id>.config` at startup and rejects every custom field.
-
-**Fix**: Export `configSchema` from the plugin object, listing all allowed fields:
-```typescript
-const plugin = {
-  id: "openclaw-goal-agent",
-  configSchema: {
-    jsonSchema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        apiBaseUrl:     { type: "string" },
-        telegramChatId: { type: "string" },
-        hmacSecret:     { type: "string" },   // optional
-      },
-      required: ["apiBaseUrl", "telegramChatId"],
-    },
-  },
-  register(api) { ... },
-};
-```
-
-`configSchema` is part of the `OpenClawPluginDefinition` type (`src/plugins/types.ts:236`). Any field in `openclaw.json` entry config that isn't declared here will be rejected on startup.
+**Note**: Adding `configSchema` to the JS module export (`module.exports = { configSchema, register }`) has no effect on this validation — OpenClaw never reads it from there.
 
 ---
 
@@ -212,4 +199,4 @@ const plugin = {
 | 4 | `ECONNREFUSED ::1:8000` | `localhost` → IPv6 on Linux | Use `127.0.0.1` explicitly |
 | 5 | Config changes in `openclaw.json` not picked up | Config read from `process.env` (never set) instead of `api.pluginConfig` | Load config inside `register(api)` from `api.pluginConfig` |
 | 6 | `401 Invalid request signature` | `hmacSecret` missing from plugin config | Add `HMAC_SECRET` from `.env` to both `config.json` and `openclaw.json` patcher |
-| 7 | `Config invalid: must NOT have additional properties` | No `configSchema` → default rejects all fields | Declare `configSchema.jsonSchema` with all allowed properties |
+| 7 | `Config invalid: must NOT have additional properties` | Field missing from `openclaw.plugin.json` `configSchema` | Add field to `configSchema.properties` in `openclaw.plugin.json` (JS export ignored) |
