@@ -85,6 +85,21 @@ const plugin = {
   id: "openclaw-goal-agent",
   name: "Goal Agent",
   description: "AI-powered goal and habit tracking agent tools",
+  // Declare the config schema so OpenClaw's validator accepts our custom fields.
+  // Without this, OpenClaw defaults to emptyPluginConfigSchema() which uses
+  // { additionalProperties: false, properties: {} } and rejects every field.
+  configSchema: {
+    jsonSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        apiBaseUrl:     { type: "string" },
+        telegramChatId: { type: "string" },
+        hmacSecret:     { type: "string" },  // optional; omitted when HMAC disabled
+      },
+      required: ["apiBaseUrl", "telegramChatId"],
+    },
+  },
   register(api: OpenClawPluginApi) {
     // Config must be loaded here (not at module level) because api.pluginConfig
     // is only available when register() is called by OpenClaw at runtime.
