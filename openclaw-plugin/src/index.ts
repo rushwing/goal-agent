@@ -78,8 +78,22 @@ const allTools = {
 // causing all 36 tools to resolve with name=undefined → "tool name conflict"
 // spam → gateway crash. Using the object path makes factory = (_ctx) => tool,
 // so tool.name is always the correct string.
+// Minimal JSON Schema object that satisfies pi-coding-agent's ToolDefinition.
+// pi-coding-agent accesses tool.parameters.properties when building the LLM
+// API request body, so parameters must never be undefined.
+const EMPTY_SCHEMA = { type: "object" as const, properties: {} };
+
+// AnyAgentTool shape expected by OpenClaw's registerTool (object path):
+//   name        → tool identifier (no spaces)
+//   label       → human-readable label shown in UI
+//   description → shown to LLM; empty string is valid
+//   parameters  → JSON Schema for the tool's input; MUST have type+properties
+//   execute     → (id, params, signal?) => AgentToolResult
 interface PluginTool {
   name: string;
+  label: string;
+  description: string;
+  parameters: { type: "object"; properties: Record<string, unknown> };
   execute: (
     _id: string,
     params: Record<string, unknown>
@@ -97,6 +111,9 @@ const plugin = {
     for (const [name, handler] of Object.entries(allTools)) {
       api.registerTool({
         name,
+        label: name,
+        description: "",   // empty is valid; avoids undefined.trim() crash
+        parameters: EMPTY_SCHEMA,
         execute: async (
           _id: string,
           params: Record<string, unknown>
