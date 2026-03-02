@@ -13,7 +13,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
-import { createClient, PluginConfig } from "./client";
+import { createClient, createGoGetterClient, PluginConfig } from "./client";
 import { registerAdminTools } from "./tools/admin.tools";
 import { registerPlanTools } from "./tools/plan.tools";
 import { registerCheckinTools } from "./tools/checkin.tools";
@@ -90,11 +90,14 @@ const plugin = {
     // is only available when register() is called by OpenClaw at runtime.
     const config = loadConfig(api.pluginConfig);
     const client = createClient(config);
+    // go_getter tools (check-ins, progress) use the go_getter's chat ID so that
+    // role-based auth resolves to Role.go_getter on the server side.
+    const goGetterClient = createGoGetterClient(config);
 
     const allTools = {
       ...registerAdminTools(client),
       ...registerPlanTools(client),
-      ...registerCheckinTools(client),
+      ...registerCheckinTools(goGetterClient),
       ...registerReportTools(client),
       ...registerWizardTools(client),
       ...registerTracksTools(client),

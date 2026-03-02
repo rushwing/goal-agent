@@ -5,7 +5,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
-from github import Github, GithubException
+from github import Auth, Github, GithubException
 from github.Repository import Repository
 
 from app.config import get_settings
@@ -17,7 +17,7 @@ _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="github")
 
 
 def _get_repo() -> Repository:
-    g = Github(settings.GITHUB_PAT)
+    g = Github(auth=Auth.Token(settings.GITHUB_PAT))
     return g.get_repo(settings.GITHUB_DATA_REPO)
 
 

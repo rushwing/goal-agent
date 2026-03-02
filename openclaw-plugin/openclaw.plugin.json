@@ -20,6 +20,10 @@
       "hmacSecret": {
         "type": "string",
         "description": "HMAC-SHA256 shared secret matching HMAC_SECRET in .env (optional; omit in dev mode)"
+      },
+      "goGetterChatId": {
+        "type": "string",
+        "description": "Telegram Chat ID of the go_getter (child/student). Required for check-in tools to work — must match the telegram_chat_id in the go_getters DB table. When omitted, telegramChatId is used (will 403 on go_getter-only endpoints)."
       }
     }
   },

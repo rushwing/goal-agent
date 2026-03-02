@@ -142,9 +142,15 @@ async def generate_plan(
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
     """
-    Generate an AI-powered study plan for a target using Kimi.
-    Automatically commits the plan to GitHub.
-    Requires best_pal/admin role.
+    [ADVANCED] Generate a standalone AI study plan directly for a single target.
+
+    IMPORTANT: For new GoalGroup creation, always use the wizard flow instead:
+      start_goal_group_wizard → set_wizard_scope → set_wizard_targets
+        → set_wizard_constraints → confirm_goal_group
+
+    Use generate_plan ONLY when you need to regenerate a plan for a single
+    target outside the wizard (e.g. admin re-planning, one-off plan fix).
+    Automatically commits the plan to GitHub. Requires best_pal/admin role.
     """
     caller_id = _require_chat_id(x_telegram_chat_id)
     if preferred_days is None:
