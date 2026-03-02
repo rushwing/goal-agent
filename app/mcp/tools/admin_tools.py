@@ -162,13 +162,30 @@ async def remove_best_pal(
     best_pal_id: int,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
-    """Remove a best pal. Requires admin role."""
+    """Remove a best pal. Blocked if they still have go_getters assigned.
+
+    Reassign all go_getters first via update_go_getter before calling this.
+    Requires admin role.
+    """
+    from sqlalchemy import func, select
+    from app.models.go_getter import GoGetter
+
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
         await require_role(db, caller_id, [Role.admin])
-        best_pal = await crud_best_pal.remove(db, id=best_pal_id)
+        best_pal = await crud_best_pal.get(db, best_pal_id)
         if not best_pal:
             raise ValueError(f"Best pal {best_pal_id} not found")
+        result = await db.execute(
+            select(func.count()).select_from(GoGetter).where(GoGetter.best_pal_id == best_pal_id)
+        )
+        go_getter_count = result.scalar_one()
+        if go_getter_count > 0:
+            raise ValueError(
+                f"Best pal {best_pal_id} has {go_getter_count} go_getter(s) assigned. "
+                "Reassign them first via update_go_getter with a new best_pal_id."
+            )
+        await crud_best_pal.remove(db, id=best_pal_id)
         await db.commit()
         return {"success": True, "best_pal_id": best_pal_id}
 

@@ -103,15 +103,22 @@ async def delete_target(
     target_id: int,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
-    """Delete a learning target. Requires admin role."""
+    """Cancel a learning target by setting its status to 'cancelled' (safe soft-delete).
+
+    This preserves all associated plans, milestones, and check-in history.
+    Physical deletion is intentionally blocked when a target has plans.
+    Requires admin role.
+    """
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
         await require_role(db, caller_id, [Role.admin])
-        target = await crud_target.remove(db, id=target_id)
+        target = await crud_target.get(db, target_id)
         if not target:
             raise ValueError(f"Target {target_id} not found")
+        target.status = TargetStatus.cancelled
+        db.add(target)
         await db.commit()
-        return {"success": True, "target_id": target_id}
+        return {"success": True, "target_id": target_id, "status": "cancelled"}
 
 
 @mcp.tool()
@@ -277,22 +284,41 @@ async def update_plan(
 
 
 @mcp.tool()
-async def delete_plan(
+async def cancel_plan(
     plan_id: int,
     x_telegram_chat_id: Optional[int] = None,
 ) -> dict:
-    """Delete a plan. Requires admin role."""
+    """Cancel a plan by setting its status to 'cancelled' (safe soft-delete).
+
+    This is the correct way to discard or replace a plan. It preserves all
+    milestones, tasks and check-in history for audit purposes. Physical
+    deletion is intentionally not supported through the conversation interface.
+
+    Typical "delete and rebuild" flow:
+      1. cancel_plan(plan_id)          ← marks old plan as cancelled
+      2. start_goal_group_wizard(...)  ← guided Q&A to build the new plan
+      3. set_wizard_scope / targets / constraints / confirm_goal_group
+
+    Requires best_pal/admin role.
+    """
     caller_id = _require_chat_id(x_telegram_chat_id)
     async with AsyncSessionLocal() as db:
-        await require_role(db, caller_id, [Role.admin])
+        await require_role(db, caller_id, [Role.admin, Role.best_pal])
         plan = await crud_plan.get(db, plan_id)
         if not plan:
             raise ValueError(f"Plan {plan_id} not found")
         target = await crud_target.get(db, plan.target_id)
         await verify_best_pal_owns_go_getter(db, caller_id, target.go_getter_id)
-        await crud_plan.remove(db, id=plan_id)
+        from app.models.plan import PlanStatus
+        plan.status = PlanStatus.cancelled
+        db.add(plan)
         await db.commit()
-        return {"success": True, "plan_id": plan_id}
+        return {
+            "success": True,
+            "plan_id": plan_id,
+            "status": "cancelled",
+            "message": "Plan cancelled. Use the wizard flow to create a replacement.",
+        }
 
 
 @mcp.tool()
