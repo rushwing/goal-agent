@@ -55,6 +55,7 @@
     "list_reports",
     "start_goal_group_wizard",
     "get_wizard_status",
+    "get_wizard_sources",
     "set_wizard_scope",
     "set_wizard_targets",
     "set_wizard_constraints",

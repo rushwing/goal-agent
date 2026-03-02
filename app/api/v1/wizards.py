@@ -260,6 +260,21 @@ async def cancel_wizard(
     return _build_response(wizard)
 
 
+@router.get("/{wizard_id}/sources")
+async def get_wizard_sources(
+    wizard_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    chat_id: Annotated[int, Depends(require_best_pal_or_admin)],
+):
+    """Return reference materials found during web research for this wizard."""
+    wizard = await _load_wizard_and_verify(wizard_id, chat_id, db)
+    return {
+        "wizard_id": wizard.id,
+        "reference_materials": wizard.reference_materials or {},
+        "search_errors": wizard.search_errors or {},
+    }
+
+
 # ---------------------------------------------------------------------------
 # Guard helper
 # ---------------------------------------------------------------------------

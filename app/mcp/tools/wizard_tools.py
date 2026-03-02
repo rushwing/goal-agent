@@ -161,6 +161,32 @@ async def get_wizard_status(
 
 
 @mcp.tool()
+async def get_wizard_sources(
+    wizard_id: int,
+    go_getter_id: int,
+    x_telegram_chat_id: Optional[int] = None,
+) -> dict:
+    """Get curriculum reference materials found during web research for this wizard.
+
+    Call after set_wizard_constraints to review sources before confirming.
+    Returns reference_materials: {target_id: [{title, source, url, key_points}]}.
+    Empty dict if web research has not run yet or found nothing.
+
+    Requires best_pal/admin role.
+    """
+    caller_id = _require_chat_id(x_telegram_chat_id)
+    async with AsyncSessionLocal() as db:
+        await require_role(db, caller_id, [Role.admin, Role.best_pal])
+        await verify_best_pal_owns_go_getter(db, caller_id, go_getter_id)
+        wizard = await _load_wizard(db, wizard_id, go_getter_id)
+        return {
+            "wizard_id": wizard_id,
+            "reference_materials": wizard.reference_materials or {},
+            "search_errors": wizard.search_errors or {},
+        }
+
+
+@mcp.tool()
 async def set_wizard_scope(
     wizard_id: int,
     go_getter_id: int,
