@@ -214,8 +214,12 @@ async def adjust(
     return wizard
 
 
-async def confirm(db: AsyncSession, wizard: GoalGroupWizard) -> GoalGroup:
+async def confirm(db: AsyncSession, wizard: GoalGroupWizard) -> tuple[GoalGroup, list[dict]]:
     """Atomically create the GoalGroup and activate all draft plans.
+
+    Returns (goal_group, superseded_plans) where superseded_plans is a list of
+    {"plan_id", "title", "target_id"} dicts for any previously-active plans that
+    were marked completed to make room for the new wizard plans.
 
     Raises ValueError if the wizard has unresolved blocker risks.
     """
@@ -259,6 +263,7 @@ async def confirm(db: AsyncSession, wizard: GoalGroupWizard) -> GoalGroup:
     )
 
     # Activate all draft plans and link them + their targets to the group
+    superseded_plans: list[dict] = []
     target_ids_linked: set[int] = set()
     for plan_id in wizard.draft_plan_ids:
         result = await db.execute(select(Plan).where(Plan.id == plan_id))
@@ -277,6 +282,11 @@ async def confirm(db: AsyncSession, wizard: GoalGroupWizard) -> GoalGroup:
                 )
             )
             for old_plan in existing_active.scalars().all():
+                superseded_plans.append({
+                    "plan_id": old_plan.id,
+                    "title": old_plan.title,
+                    "target_id": old_plan.target_id,
+                })
                 old_plan.status = PlanStatus.completed
                 db.add(old_plan)
 
@@ -301,12 +311,13 @@ async def confirm(db: AsyncSession, wizard: GoalGroupWizard) -> GoalGroup:
         status=WizardStatus.confirmed,
     )
     logger.info(
-        "Wizard %d confirmed: created GoalGroup %d with plans %s",
+        "Wizard %d confirmed: created GoalGroup %d with plans %s (superseded: %s)",
         wizard.id,
         group.id,
         wizard.draft_plan_ids,
+        [p["plan_id"] for p in superseded_plans],
     )
-    return group
+    return group, superseded_plans
 
 
 async def cancel_wizard(db: AsyncSession, wizard: GoalGroupWizard) -> None:

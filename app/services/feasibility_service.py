@@ -151,8 +151,10 @@ async def check_feasibility(
                     level="error",
                     subcategory_id=sub_id,
                     detail=(
-                        f"Another active plan already exists for subcategory {sub_id}. "
-                        "Complete or cancel it before adding this target to a new group."
+                        f"Subcategory {sub_id} already has active Plan #{conflicting_plan.id} "
+                        f"('{conflicting_plan.title}'). This wizard cannot confirm while that "
+                        "plan is active — it belongs to a different target and will NOT be "
+                        "automatically replaced. Cancel or complete that plan first, then retry."
                     ),
                 )
             )
