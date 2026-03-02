@@ -78,9 +78,28 @@ async def delete_target(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[int, Depends(require_admin)],
 ):
-    t = await crud_target.remove(db, id=target_id)
+    """Physical delete — admin only. Blocked if the target already has plans.
+
+    Targets with plans cannot be physically deleted to preserve audit history.
+    Use PATCH /targets/{target_id} with {"status": "cancelled"} to deactivate instead.
+    """
+    from sqlalchemy import func
+    from app.models.plan import Plan
+
+    t = await crud_target.get(db, target_id)
     if not t:
         raise HTTPException(404, "Target not found")
+    result = await db.execute(
+        select(func.count()).select_from(Plan).where(Plan.target_id == target_id)
+    )
+    plan_count = result.scalar_one()
+    if plan_count > 0:
+        raise HTTPException(
+            409,
+            f"Target {target_id} has {plan_count} plan(s) and cannot be physically deleted. "
+            "Set status='cancelled' via PATCH /targets/{target_id} to deactivate it instead.",
+        )
+    await crud_target.remove(db, id=target_id)
     return {"success": True}
 
 
@@ -173,7 +192,26 @@ async def delete_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[int, Depends(require_admin)],
 ):
-    p = await crud_plan.remove(db, id=plan_id)
-    if not p:
+    """Physical delete — admin only. Blocked if the plan already has milestones.
+
+    Plans with milestones/tasks cannot be physically deleted to preserve audit
+    history. Use PATCH /plans/{id} with {"status": "cancelled"} instead.
+    """
+    plan = await crud_plan.get(db, plan_id)
+    if not plan:
         raise HTTPException(404, "Plan not found")
+    from sqlalchemy import func
+    result = await db.execute(
+        select(func.count()).select_from(WeeklyMilestone).where(WeeklyMilestone.plan_id == plan_id)
+    )
+    milestone_count = result.scalar_one()
+    if milestone_count > 0:
+        raise HTTPException(
+            409,
+            f"Plan {plan_id} has {milestone_count} milestone(s) and cannot be physically deleted. "
+            "Set status='cancelled' via PATCH /plans/{plan_id} to deactivate it instead, "
+            "then create a new plan via the wizard flow.",
+        )
+    await db.delete(plan)
+    await db.flush()
     return {"success": True}

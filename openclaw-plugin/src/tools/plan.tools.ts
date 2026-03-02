@@ -28,25 +28,15 @@ export function registerPlanTools(client: AxiosInstance) {
       return data;
     },
 
-    delete_target: async (args: { target_id: number }) => {
-      const { data } = await client.delete(`/targets/${args.target_id}`);
-      return data;
+    cancel_target: async (args: { target_id: number }) => {
+      // Soft-cancel: preserves plans/milestones/check-in history.
+      // Physical deletion is intentionally blocked at the API level.
+      const { data } = await client.patch(`/targets/${args.target_id}`, { status: "cancelled" });
+      return { success: true, target_id: args.target_id, status: "cancelled", ...data };
     },
 
     list_targets: async (args: { go_getter_id: number }) => {
       const { data } = await client.get("/targets", { params: { go_getter_id: args.go_getter_id } });
-      return data;
-    },
-
-    generate_plan: async (args: {
-      target_id: number;
-      start_date: string;
-      end_date: string;
-      daily_study_minutes?: number;
-      preferred_days?: number[];
-      extra_instructions?: string;
-    }) => {
-      const { data } = await client.post("/plans/generate", args);
       return data;
     },
 
@@ -56,9 +46,11 @@ export function registerPlanTools(client: AxiosInstance) {
       return data;
     },
 
-    delete_plan: async (args: { plan_id: number }) => {
-      const { data } = await client.delete(`/plans/${args.plan_id}`);
-      return data;
+    cancel_plan: async (args: { plan_id: number }) => {
+      // Soft-cancel: preserves milestones/tasks/check-in history.
+      // Physical deletion is intentionally blocked at the API level.
+      const { data } = await client.patch(`/plans/${args.plan_id}`, { status: "cancelled" });
+      return { success: true, plan_id: args.plan_id, status: "cancelled", ...data };
     },
 
     list_plans: async (args: { go_getter_id?: number; target_id?: number }) => {

@@ -2,6 +2,7 @@
 
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.api.v1.deps import require_admin
@@ -92,7 +93,25 @@ async def delete_best_pal(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[int, Depends(require_admin)],
 ):
-    best_pal = await crud_best_pal.remove(db, id=best_pal_id)
+    """Physical delete — admin only. Blocked if the best_pal has go_getters assigned.
+
+    Reassign all go_getters to another best_pal first (PATCH /admin/go_getters/{id}
+    with {"best_pal_id": <new_id>}) before deleting.
+    """
+    from app.models.go_getter import GoGetter
+
+    best_pal = await crud_best_pal.get(db, best_pal_id)
     if not best_pal:
         raise HTTPException(404, "Best pal not found")
+    result = await db.execute(
+        select(func.count()).select_from(GoGetter).where(GoGetter.best_pal_id == best_pal_id)
+    )
+    go_getter_count = result.scalar_one()
+    if go_getter_count > 0:
+        raise HTTPException(
+            409,
+            f"Best pal {best_pal_id} has {go_getter_count} go_getter(s) assigned. "
+            "Reassign them first via PATCH /admin/go_getters/{id} with a new best_pal_id.",
+        )
+    await crud_best_pal.remove(db, id=best_pal_id)
     return {"success": True}
