@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Optional
@@ -353,6 +354,60 @@ async def _cancel_draft_plans(db: AsyncSession, wizard: GoalGroupWizard) -> None
     await db.flush()
 
 
+async def _run_web_research(
+    db: AsyncSession, wizard: GoalGroupWizard, grade: str
+) -> tuple[dict, dict]:
+    """Run web research for all targets concurrently (best-effort).
+
+    Returns (reference_materials, search_errors) dicts keyed by str(target_id).
+    Saves results to wizard immediately. Never raises.
+    """
+    from app.services.web_research_service import search_study_materials
+    from app.models.target import Target
+
+    target_specs = wizard.target_specs or []
+    targets: dict[int, Target] = {}
+    for spec in target_specs:
+        tid = spec.get("target_id")
+        if tid is None:
+            continue
+        t_result = await db.execute(select(Target).where(Target.id == tid))
+        t = t_result.scalar_one_or_none()
+        if t and t.go_getter_id == wizard.go_getter_id:
+            targets[tid] = t
+
+    ordered_ids = [s["target_id"] for s in target_specs if s.get("target_id") in targets]
+    if not ordered_ids:
+        return {}, {}
+
+    coros = [
+        search_study_materials(
+            subject=targets[tid].subject,
+            grade=grade,
+            description=targets[tid].description or targets[tid].title or "",
+        )
+        for tid in ordered_ids
+    ]
+    raw_results = await asyncio.gather(*coros, return_exceptions=True)
+
+    reference_materials: dict = {}
+    search_errors: dict = {}
+    for tid, res in zip(ordered_ids, raw_results):
+        if isinstance(res, Exception):
+            logger.warning("Web research failed for target %d: %s", tid, res)
+            search_errors[str(tid)] = str(res)
+        elif res:
+            reference_materials[str(tid)] = res
+
+    await crud_wizard.update_wizard(
+        db,
+        wizard,
+        reference_materials=reference_materials or None,
+        search_errors=search_errors or None,
+    )
+    return reference_materials, search_errors
+
+
 async def _generate_and_check(db: AsyncSession, wizard: GoalGroupWizard) -> None:
     """Generate draft plans for all target_specs, then run feasibility.
 
@@ -382,6 +437,9 @@ async def _generate_and_check(db: AsyncSession, wizard: GoalGroupWizard) -> None
     wizard = await crud_wizard.update_wizard(
         db, wizard, status=WizardStatus.generating_plans, generation_errors=None
     )
+
+    # Run web research per target (parallel, best-effort)
+    research_results, _ = await _run_web_research(db, wizard, go_getter.grade)
 
     for spec in target_specs:
         target_id = spec.get("target_id")
@@ -424,6 +482,7 @@ async def _generate_and_check(db: AsyncSession, wizard: GoalGroupWizard) -> None
                 preferred_days=preferred_days,
                 initial_status=PlanStatus.draft,
                 deactivate_existing=False,  # P0: preserve live plans until confirm
+                reference_materials=research_results.get(str(target_id)),
             )
             draft_plan_ids.append(new_plan.id)
         except Exception as exc:

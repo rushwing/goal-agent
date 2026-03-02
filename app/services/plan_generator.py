@@ -67,6 +67,7 @@ def _build_user_prompt(
     daily_study_minutes: int,
     preferred_days: list[int],
     extra_instructions: str | None,
+    reference_materials: list[dict] | None = None,
 ) -> str:
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     pref_day_names = [day_names[d] for d in sorted(preferred_days)]
@@ -84,6 +85,12 @@ def _build_user_prompt(
     )
     if extra_instructions:
         prompt += f"Extra instructions: {extra_instructions}\n"
+    if reference_materials:
+        prompt += "\n## 参考教学资料（来自小红书等平台）\n"
+        for mat in reference_materials[:5]:
+            prompt += f"- 《{mat['title']}》({mat.get('source', '')})\n"
+            for kp in mat.get('key_points', [])[:4]:
+                prompt += f"  • {kp}\n"
     return prompt
 
 
@@ -97,6 +104,7 @@ async def generate_plan(
     daily_study_minutes: int | None = None,
     preferred_days: list[int] | None = None,
     extra_instructions: str | None = None,
+    reference_materials: list[dict] | None = None,
     initial_status: PlanStatus = PlanStatus.active,
     deactivate_existing: bool = True,
 ) -> Plan:
@@ -115,6 +123,7 @@ async def generate_plan(
         daily_study_minutes if daily_study_minutes is not None else _DEFAULT_DAILY_MINUTES,
         preferred_days if preferred_days is not None else _DEFAULT_PREFERRED_DAYS,
         extra_instructions,
+        reference_materials=reference_materials,
     )
 
     plan_data: dict[str, Any] | None = None

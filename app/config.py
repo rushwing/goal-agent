@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # Leave empty in dev/test environments to skip verification.
     HMAC_SECRET: str = ""
 
+    # Jina AI (web search + reader)
+    JINA_API_KEY: str = ""
+    JINA_SEARCH_URL: str = "https://s.jina.ai"
+    JINA_READER_URL: str = "https://r.jina.ai"
+
     # Bootstrap admin chat IDs (comma-separated)
     ADMIN_CHAT_IDS: str = ""
 

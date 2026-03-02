@@ -55,6 +55,8 @@ class GoalGroupWizard(Base, TimestampMixin):
         Integer, ForeignKey("goal_groups.id"), nullable=True
     )
     generation_errors: Mapped[Optional[list[Any]]] = mapped_column(JSON, nullable=True)
+    reference_materials: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    search_errors: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     go_getter: Mapped["GoGetter"] = relationship("GoGetter")
