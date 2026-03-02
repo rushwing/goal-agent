@@ -83,27 +83,27 @@ else
     APP_PORT="${APP_PORT:-8000}"
     ADMIN_CHAT_ID="${ADMIN_CHAT_IDS%%,*}"   # first entry only
     HMAC_SECRET="${HMAC_SECRET:-}"          # empty = HMAC disabled (dev mode)
+    GO_GETTER_CHAT_ID="${GO_GETTER_CHAT_ID:-}"  # optional: go_getter's personal chat ID
 
     # ── Write config.json as fallback (used when api.pluginConfig absent) ──────
     CONFIG_FILE="$PLUGIN_DIR/config.json"
     if [[ ! -f "$CONFIG_FILE" ]] || [[ ".env" -nt "$CONFIG_FILE" ]]; then
       step "Writing plugin config.json (fallback)…"
-      if [[ -n "$HMAC_SECRET" ]]; then
-        cat > "$CONFIG_FILE" <<JSON
-{
-  "apiBaseUrl": "http://127.0.0.1:${APP_PORT}/api/v1",
-  "telegramChatId": "${ADMIN_CHAT_ID}",
-  "hmacSecret": "${HMAC_SECRET}"
+      python3 - "$CONFIG_FILE" "${APP_PORT}" "${ADMIN_CHAT_ID}" "${HMAC_SECRET}" "${GO_GETTER_CHAT_ID}" <<'CFGEOF'
+import json, sys
+out_path, port, chat_id, hmac_secret, go_getter_chat_id = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+cfg = {
+    "apiBaseUrl": f"http://127.0.0.1:{port}/api/v1",
+    "telegramChatId": chat_id,
 }
-JSON
-      else
-        cat > "$CONFIG_FILE" <<JSON
-{
-  "apiBaseUrl": "http://127.0.0.1:${APP_PORT}/api/v1",
-  "telegramChatId": "${ADMIN_CHAT_ID}"
-}
-JSON
-      fi
+if hmac_secret:
+    cfg["hmacSecret"] = hmac_secret
+if go_getter_chat_id:
+    cfg["goGetterChatId"] = go_getter_chat_id
+with open(out_path, "w") as f:
+    json.dump(cfg, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+CFGEOF
     fi
 
     # ── Clean up any prior extension registrations (copy or symlink) ────────────
@@ -136,9 +136,9 @@ JSON
     OPENCLAW_JSON="$HOME/.openclaw/openclaw.json"
     if [[ -f "$OPENCLAW_JSON" ]]; then
       step "Patching openclaw.json plugin registration…"
-      python3 - "$OPENCLAW_JSON" "${APP_PORT}" "${ADMIN_CHAT_ID}" "${PLUGIN_DIR}" "${HMAC_SECRET}" <<'PYEOF'
+      python3 - "$OPENCLAW_JSON" "${APP_PORT}" "${ADMIN_CHAT_ID}" "${PLUGIN_DIR}" "${HMAC_SECRET}" "${GO_GETTER_CHAT_ID}" <<'PYEOF'
 import json, sys
-path, port, chat_id, plugin_dir, hmac_secret = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+path, port, chat_id, plugin_dir, hmac_secret, go_getter_chat_id = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
 with open(path) as f:
     cfg = json.load(f)
 
@@ -172,13 +172,16 @@ plugin_cfg = {
 }
 if hmac_secret:
     plugin_cfg["hmacSecret"] = hmac_secret
+if go_getter_chat_id:
+    plugin_cfg["goGetterChatId"] = go_getter_chat_id
 entry["config"] = plugin_cfg
 
 with open(path, "w") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write("\n")
 hmac_info = "  hmacSecret=***" if hmac_secret else "  hmacSecret=(none)"
-print(f"  apiBaseUrl=http://127.0.0.1:{port}/api/v1  telegramChatId={chat_id}{hmac_info}")
+gg_info = f"  goGetterChatId={go_getter_chat_id}" if go_getter_chat_id else "  goGetterChatId=(none)"
+print(f"  apiBaseUrl=http://127.0.0.1:{port}/api/v1  telegramChatId={chat_id}{hmac_info}{gg_info}")
 PYEOF
     else
       warn "~/.openclaw/openclaw.json not found — skipping openclaw.json patch."

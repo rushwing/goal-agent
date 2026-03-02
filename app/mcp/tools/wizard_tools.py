@@ -115,6 +115,15 @@ async def start_goal_group_wizard(
 ) -> dict:
     """Start a guided GoalGroup creation wizard for a go_getter.
 
+    THIS IS THE PRIMARY ENTRY POINT for creating a new study plan / GoalGroup.
+    Always use this wizard flow when the user wants to set up goals or a study plan:
+      1. start_goal_group_wizard  → get wizard_id
+      2. set_wizard_scope         → set title + date range (ask user for these)
+      3. set_wizard_targets       → set which targets to include (ask user)
+      4. set_wizard_constraints   → set daily minutes + preferred days, triggers AI plan gen
+      5. confirm_goal_group       → finalise (if feasibility_passed=True)
+
+    Ask the user for each piece of information conversationally before calling each step.
     Returns wizard_id and status='collecting_scope'.
     Raises an error if the go_getter already has an active wizard — call
     get_wizard_status with the existing wizard_id to resume it instead.
