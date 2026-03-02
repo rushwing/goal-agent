@@ -283,11 +283,13 @@ async def confirm(db: AsyncSession, wizard: GoalGroupWizard) -> tuple[GoalGroup,
                 )
             )
             for old_plan in existing_active.scalars().all():
-                superseded_plans.append({
-                    "plan_id": old_plan.id,
-                    "title": old_plan.title,
-                    "target_id": old_plan.target_id,
-                })
+                superseded_plans.append(
+                    {
+                        "plan_id": old_plan.id,
+                        "title": old_plan.title,
+                        "target_id": old_plan.target_id,
+                    }
+                )
                 old_plan.status = PlanStatus.completed
                 db.add(old_plan)
 
@@ -392,7 +394,7 @@ async def _run_web_research(
 
     reference_materials: dict = {}
     search_errors: dict = {}
-    for tid, res in zip(ordered_ids, raw_results):
+    for tid, res in zip(ordered_ids, raw_results, strict=False):
         if isinstance(res, Exception):
             logger.warning("Web research failed for target %d: %s", tid, res)
             search_errors[str(tid)] = str(res)
