@@ -11,11 +11,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "mysql+aiomysql://planner:password@localhost:3306/goal_agent"
 
-    # Kimi AI
+    # Kimi Coding (Anthropic-compatible, family/coding plan)
     KIMI_API_KEY: str = "sk-placeholder"
-    KIMI_BASE_URL: str = "https://api.moonshot.cn/v1"
-    KIMI_MODEL_SHORT: str = "moonshot-v1-8k"
-    KIMI_MODEL_LONG: str = "moonshot-v1-32k"
+    KIMI_BASE_URL: str = "https://api.kimi.com/coding/"
+    KIMI_MODEL_SHORT: str = "k2p5"
+    KIMI_MODEL_LONG: str = "k2p5"
 
     # Telegram
     TELEGRAM_BEST_PAL_BOT_TOKEN: str = ""
