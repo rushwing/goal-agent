@@ -382,7 +382,7 @@ async def confirm_goal_group(
         await require_role(db, caller_id, [Role.admin, Role.best_pal])
         await verify_best_pal_owns_go_getter(db, caller_id, go_getter_id)
         wizard = await _load_wizard(db, wizard_id, go_getter_id)
-        group = await wizard_service.confirm(db, wizard)
+        group, superseded_plans = await wizard_service.confirm(db, wizard)
         await db.commit()
         return {
             "goal_group_id": group.id,
@@ -392,6 +392,9 @@ async def confirm_goal_group(
             "end_date": str(group.end_date),
             "wizard_id": wizard_id,
             "status": "confirmed",
+            # Plans that were active before the wizard and are now completed.
+            # Empty list means this is a fresh start with no prior plans.
+            "superseded_plans": superseded_plans,
         }
 
 

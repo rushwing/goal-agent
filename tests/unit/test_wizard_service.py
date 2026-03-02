@@ -310,12 +310,13 @@ async def test_confirm_creates_goal_group(db, wizard, target, go_getter):
     # feasibility_passed should be 1 (no blockers in clean scenario)
     assert wizard.feasibility_passed == 1
 
-    group = await wizard_service.confirm(db, wizard)
+    group, superseded = await wizard_service.confirm(db, wizard)
     assert group.id is not None
     assert group.go_getter_id == go_getter.id
     assert group.title == "Summer Plan"
     assert wizard.status == WizardStatus.confirmed
     assert wizard.goal_group_id == group.id
+    assert isinstance(superseded, list)
 
 
 # ---------------------------------------------------------------------------
@@ -456,11 +457,14 @@ async def test_confirm_deactivates_existing_active_plan(db, wizard, target, go_g
         )
 
     assert wizard.feasibility_passed == 1
-    await wizard_service.confirm(db, wizard)
+    group, superseded = await wizard_service.confirm(db, wizard)
 
     await db.refresh(live_plan)
     assert live_plan.status == PlanStatus.completed, (
         "Pre-existing active plan must be completed when the draft is activated on confirm"
+    )
+    assert any(p["plan_id"] == live_plan.id for p in superseded), (
+        "Superseded plan must appear in the confirm return value"
     )
 
 

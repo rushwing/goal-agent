@@ -138,7 +138,10 @@ async def test_rule_existing_active_subcategory_fires():
     db = AsyncMock()
     # First call: RULE_EXISTING_ACTIVE_SUBCATEGORY check — returns a plan
     conflict_result = MagicMock()
-    conflict_result.scalar_one_or_none.return_value = object()  # non-None = conflict
+    mock_conflicting_plan = MagicMock()
+    mock_conflicting_plan.id = 99
+    mock_conflicting_plan.title = "Existing Math Plan"
+    conflict_result.scalar_one_or_none.return_value = mock_conflicting_plan
     # Second call: RULE_EXISTING_ACTIVE_GROUP check — no active group
     empty_result = MagicMock()
     empty_result.scalar_one_or_none.return_value = None
